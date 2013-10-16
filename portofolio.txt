@@ -1,0 +1,149 @@
+[default]
+# Programmmeldungen
+# 0x00000-0x0ffff  Programmmeldungen
+# 0x00000-0x00fff    Allgemeine Meldungen / Meldungen Hauptprogramm
+# 0x00000-0x001ff      Meldungen Hauptprogramm 
+# 0x00200-0x002ff      Meldungen Modul CmdLine  
+# 0x00200-0x0020f        Meldung 1. Modul CmdLine Allgemein
+# 0x00210-0x0021f        Meldung 1. Modul CmdLine 1. Subroutine
+# 0x00220-0x0022f        Meldung 1. Modul CmdLine 2. Subroutine
+# 0x00300-0x003ff      Meldungen Modul Trace
+# 0x00400-0x004ff      Meldungen Modul Configuration
+# 0x00500-0x005ff      Meldungen Modul DBAccess
+# 0x01000-0x01fff    Usage
+# 0x02000-0x07fff    Modul- und procedurespezifische Meldungen
+# 0x02000-0x02fff      Meldung 1. Modul PROGRAMM.pm
+# 0x02000-0x020ff        Meldung 1. Modul Allgemein
+# 0x02100-0x021ff        Meldung 1. Modul 1. Subroutine
+# 0x02200-0x022ff        Meldung 1. Modul 2. Subroutine
+# 0x03000-0x03fff      Meldung 2. Modul
+# 0x04000-0x04fff      Meldung 3. Modul
+# 0x05000-0x05fff      Meldung 4. Modul
+# 0x06000-0x06fff      Meldung 5. Modul
+# 0x07000-0x07fff      Meldung 6. Modul
+# 0x08000-0x0ffff  Fehlermeldungen
+# 0x08000-0x09fff    Allgemeine Fehlermeldungen / Fehlermeldungen Hauptprogramm
+# 0x08000-0x081ff      Fehlermeldung Hauptprogramm 
+# 0x08200-0x082ff      Fehlermeldung Modul CmdLine  
+# 0x08200-0x0820f        Fehlermeldung 1. Modul CmdLine Allgemein
+# 0x08210-0x0821f        Fehlermeldung 1. Modul CmdLine 1. Subroutine
+# 0x08220-0x0822f        Fehlermeldung 1. Modul CmdLine 2. Subroutine
+# 0x08300-0x083ff      Fehlermeldung Modul Trace
+# 0x08400-0x084ff      Fehlermeldung Modul Configuration
+# 0x08500-0x085ff      Fehlermeldung Modul DBAccess
+# 0x0a000-0x0ffff    Modul- und procedurespezifische Fehlermeldungen
+# 0x0a000-0x0afff      Fehlermeldung 1. Modul PROGRAMM.pm
+# 0x0a000-0x0a0ff        Fehlermeldung 1. Modul Allgemein
+# 0x0a100-0x0a1ff        Fehlermeldung 1. Modul 1. Subroutine
+# 0x0a200-0x0a2ff        Fehlermeldung 1. Modul 2. Subroutine
+# 0x0b000-0x0bfff      Fehlermeldung 2. Modul
+# 0x0c000-0x0cfff      Fehlermeldung 3. Modul
+# 0x0d000-0x0dfff      Fehlermeldung 4. Modul
+# 0x0e000-0x0efff      Fehlermeldung 5. Modul
+# 0x0f000-0x0ffff      Fehlermeldung 6. Modul
+# 0x10000-0xfffff  Benutzerspezifische Meldungen
+
+# Allgemeine Loggingausgaben
+0x00000 = Unbekannter Meldungscode: %s
+0x00001 = Starte %s %s
+0x00002 = Beende %s %s
+0x00003 = SQL: Tabelle: %s  Statement: %s  Ergebnis: %s
+0x00004 = Ergebnis: <%s> <%s> <%s> <%s> <%s> <%s> <%s>
+0x00006 = Versende %s an %s Betreff: %s
+0x00007 = Fehlerstatus: %s %s %s
+0x00008 = %s:%s:%s:Partner:%s: Kunde hat kein %s
+0x00009 = %s:%s:%s:Partner:%s: BLZ/KTO gesperrt
+0x0000a = %s:%s:%s:Partner:%s: BLZ/KTO nicht vorhanden %s
+0x0000b = %s:%s:%s:Partner:%s: Mandant ungueltig
+0x0000c = Sicherungsverzeichnis <%s> kann nicht angelegt werden: %s
+0x0000d = Programm <%s> kann nicht gestartet werden (%s)
+0x0000e = Datei <%s> kann nicht gelesen werden (%s)
+0x0000f = %s:%s:%s:Partner:%s: Partner ungueltig
+0x00010 = Logfile <%s> kann nicht geschrieben werden!
+0x00011 = Order %s(%s) Limit: %s  Stopp: %s  gültig bis: %s  TakeProfit: %s
+# Procedure lese_Eingabe 0x001xx
+
+# Usage 0x01000-0x01fff
+0x01000 = Aufruf: %s [-i <Initialisierungsfile>] [-d <Debuglevel>] [-h] [-v] [-f] [<Portofolio>]
+0x01001 = OPTION:
+0x01002 = '  -i, --init     Initialisierungsfile'
+0x01003 = '                 Default: $PRG$.ini im Verzeichnis von'
+0x01004 = '                          $PRGEXT$'
+0x01005 = '  -d, --debug    Debuginformationen anzeigen'
+0x01006 = '  -t, --test     Testmode 0: Kein Test'
+0x01007 = '                          1: Kein Schreiben in die Datenbank nur Lesen'
+0x01008 = '                          2: Kein Lesen oder Schreiben in die Datenbank'
+0x01009 = '                 Default: 0'
+0x0100a = '  -h, --help     Diese Hilfe anzeigen und beenden'
+0x0100b = '  -v, --version  Versionsinformation anzeigen und beenden'
+0x0100c = '  -f, --flush    Die ermittelten Werte werden nicht gepuffert. Bei einem Wiederaufsetzen'
+0x0100d = '                 des Programms werden alle Kurswerte neu ermittelt.'
+0x0100e = '  <Portofolio>   Portofolio, das angezeigt werden soll.'
+0x0100f = '                 Default: Sollte der Wert nicht angegeben sein, werden alle Wert aus der'
+0x01010 = '                 Initialisierungsdatei (Sektion: [Eingabe]  Wert: Fusionsliste)'
+
+0x02000 = Altes Lockfile gelöscht (%s).
+0x02001 = Lockfile <%s> angelegt.
+
+0x0a000 = Programm <%s> kann nicht mehrfach gestartet werden (%s existiert bereits)!
+
+
+# Allgemeine Warnungen
+
+# Allgemeine Exitausgaben
+0x0f001 = Fehler beim Lesen der Konfigurationsdatei oder in der Konfigurationsdatei <%s>
+0x0f002 = <%s> in der Konfigurationsdatei Sektion <%s> fuer Variable <%s> definiert.
+0x0f003 = Zu wenig oder fehlerhafte Aufrufparameter <%s>
+0x0f004 = Datei <%s> nicht vorhanden oder nicht lesbar
+0x0f005 = Fehlender INI-Eintrag Sektion <%s> Variable <%s>
+0x0f006 = Daten nicht ordenbar Datei <%s> Verzeichnis <%s>
+0x0f007 = Kann mich nicht mit der Datenquelle <%s> verbinden (%s)
+0x0f008 = Kann das Modul <%s> nicht laden
+0x0f009 = Erforderliche INI-Variable nicht gesetzt: [%s] %s
+0x0f00a = Verzeichnis %s kann nicht angelegt werden
+0x0f00b = Datei %s kann nicht angelegt werden
+0x0ffff = Fehler in der Prozedur <%s>
+
+# Modul DBAccess
+0x00500 = DB-Zugriff korrekt: <%s> <%s>
+0x08500 = DB-Zugriff fehlerhaft: <%s> <%s>
+
+# Modul _webabruf
+0x02101 = Ermittle Kursinfos für <%s> (Flags: <%s>)
+
+# Modul PORTOFOLIO
+0x02201 = Kein Kurs ermittelbar (POS_QUANTITY: <%s:%s> POS_BUY_PRICE: <%s:%s>)!
+
+# Benutzedefinierte Meldungen
+# 0x10000-0xfffff
+# 0x10000-0x10fff Log-Meldungen
+# 0x11000-0x11fff FMC-Meldungen
+0x10000 = PROGRAMM-I:| Version %s
+0x10001 = PROGRAMM-I:|$JAHR$$MONAT$$TAG$|$STUNDE$$MINUTE$$SEKUNDE$0|$PID$|Start %s %s |%s
+0x10004 = PROGRAMM-I:|$JAHR$$MONAT$$TAG$|$STUNDE$$MINUTE$$SEKUNDE$0|$PID$|Sichern / Zippen              |%s %s
+0x10005 = PROGRAMM-I:|$JAHR$$MONAT$$TAG$|$STUNDE$$MINUTE$$SEKUNDE$0|$PID$|Fehler: Altkonto nicht vorhanden BLZ: %s Kto: %s BIC: %s IBAN: %s
+0x10006 = PROGRAMM-I:|$JAHR$$MONAT$$TAG$|$STUNDE$$MINUTE$$SEKUNDE$0|$PID$|Fehler: Neukonto bereits vorhanden BLZ: %s Kto: %s BIC: %s IBAN: %s
+0x10007 = PROGRAMM-I:|$JAHR$$MONAT$$TAG$|$STUNDE$$MINUTE$$SEKUNDE$0|$PID$|Altkonto Info gelesen: Tabelle %s mit %s = %s
+0x10008 = PROGRAMM-I:|$JAHR$$MONAT$$TAG$|$STUNDE$$MINUTE$$SEKUNDE$0|$PID$|Altkonto Info nicht gefunden: Tabelle %s mit %s = %s
+0x10009 = PROGRAMM-I:|$JAHR$$MONAT$$TAG$|$STUNDE$$MINUTE$$SEKUNDE$0|$PID$|Neukonto Info geschrieben: Tabelle %s mit %s = %s
+0x10011 = PROGRAMM-E:|$JAHR$$MONAT$$TAG$|$STUNDE$$MINUTE$$SEKUNDE$0|$PID$|Keine gueltige Eingabedatei: %s
+0x10012 = PROGRAMM-E:|$JAHR$$MONAT$$TAG$|$STUNDE$$MINUTE$$SEKUNDE$0|$PID$|ABBRUCH beim SHELL-AUFRUF <%s> RC: <%s>
+0x10013 = PROGRAMM-E:|$JAHR$$MONAT$$TAG$|$STUNDE$$MINUTE$$SEKUNDE$0|$PID$|Fehler Perl - Programm : %s %s %s %s %s
+
+0x11002 = $JAHR$-$MONAT$-$TAG$;$STUNDE$:$MINUTE$:$SEKUNDE$;SPLIT;TIV0707C;1;Error;Programmabbruch;
+
+0x99999 = <%s>
+
+[english]
+# Allgemeine Loggingausgaben
+0x00000 = Unknown errorcode: %s
+0x00001 = Starting %s %s
+
+# Allgemeine Warnungen
+
+# Allgemeine Exitausgaben
+0x0f001 = Error reading configfile or error in configfile <%s>
+0x0f002 = <%s> in configfile section <%s> for variable <%s> defined.
+
+# Userdefined messages
+# 0x1000-0xfffff
