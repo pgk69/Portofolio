@@ -16,3 +16,6 @@ nytprof.out
 pm_to_blib
 *.privat
 *.ini
+.project
+PORTOFOLIO.pid
+.includepath
