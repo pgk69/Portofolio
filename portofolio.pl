@@ -39,13 +39,14 @@ $URL: https://svn.fiducia.de/svn/multicom/trunk/multicom/Framework%20OO/programm
 ';
 
 # Extraktion der Versionsinfo aus der SVN Revision
-( $VERSION = SVN_ID ) =~ s/^(.*\$Revision: )([0-9]*)(.*)$/1.0 R$2/ms;
+($VERSION = SVN_ID) =~ s/^(.*\$Revision: )([0-9]*)(.*)$/1.0 R$2/ms;
 $SVN = $VERSION . ' ' . SVN_ID;
 
 $| = 1;
 
+use FindBin qw($Bin $Script $RealBin $RealScript);
 # use lib $Bin . "/lib";       # fuer Aufruf mit voll qualifiziertem Pfad noetig
-use lib "./lib";
+use lib "${RealBin}/lib";
 use lib "/Users/pgk/Documents/00_Eclipse/Framework/lib";
 
 #
@@ -62,8 +63,7 @@ use PORTOFOLIO;
 # use PORTOFOLIO::Modul2;
 
 use Fcntl;
-use FindBin qw($Bin $Script $RealBin $RealScript);
-use Data::Dumper;
+# use Data::Dumper;
 
 #
 # Variablendefinition
@@ -74,63 +74,42 @@ use Data::Dumper;
 #
 
 # Option-Objekt: Liest und speichert die Kommandozeilenparameter
-my $cmdLine = CmdLine->new( 'flush' => 'flush' );
-$cmdLine->version($VERSION);
+$VERSION = CmdLine->new()->version($VERSION);
 
 # Trace-Objekt: Liest und speichert die Meldungstexte; gibt Tracemeldungen aus
-my $trace = Trace->new();
-$trace->version($VERSION);
+$VERSION = Trace->new()->version($VERSION);
 
 # Config-Objekt: Liest und speichert die Initialisierungsdatei
-my $config = Configuration->new();
-$config->version($VERSION);
+$VERSION = Configuration->new()->version($VERSION);
 
-## Datenbank-Objekt: Regelt dei Datenbankzugriffe
-#my $dbaccess = DBAccess->new();
-#$dbaccess->version($VERSION);
+# Datenbank-Objekt: Regelt die Datenbankzugriffe
+$VERSION = DBAccess->new()->version($VERSION);
 
 # Kopie des Fehlerkanals erstellen zur gelegentlichen Abschaltung
 no warnings;
-sysopen( MYERR, "&STDERR", O_WRONLY );
+sysopen(MYERR, "&STDERR", O_WRONLY);
 use warnings;
 
 #
-################################################################################
+#################################################################
 ## main
-################################################################################
+##################################################################
 #
-$trace->Trc( 'S', 1, 0x00001, $config->prg,
-      $VERSION . " ("
-    . $$ . ") "
-    . " Test: "
-    . $trace->test
-    . "  Parameter: "
-    . $cmdLine->{ArgStrg} );
-
-# Test der Kommandozeilenparameter
-if ( $cmdLine->option('Help') || $cmdLine->option('Version') ) {
-  $cmdLine->usage;
-  if ( $cmdLine->option('Help') || $cmdLine->option('Version') ) {
-    $trace->Exit( 0, 1, 0x00002, $config->prg, $VERSION );
-  }
-  $trace->Exit( 1, 0, 0x0f003, $cmdLine->{ArgStrg} );
-}
 
 my $prg;
-eval { $prg = PORTOFOLIO->new() };
+eval {$prg = PORTOFOLIO->new()};
 
 if ($@) {
-  $prg->Exit( 0, 1, 0x0ffff, $prg->prg, $VERSION );
+  Trace->Exit(0, 1, 0x0ffff, Configuration->prg, $VERSION);
 }
-$prg->version($VERSION);
 
 #-------------------------------------------------------------------------------
 # PRGRAMM-Start
 #-------------------------------------------------------------------------------
-$prg->lese_Portofolios( $cmdLine->argument() );
+$prg->lese_Portofolios(CmdLine->argument());
 $prg->analysiere_Portofolios();
 $prg->schreibe_Ausgabe();
 
-$prg->Exit( 0, 1, 0x00002, $prg->prg, $VERSION );
+$prg->Exit(0, 1, 0x00002, $prg->prg, $VERSION);
 
 exit 1;

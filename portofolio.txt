@@ -110,9 +110,20 @@
 
 # Modul _webabruf
 0x02101 = Ermittle Kursinfos für <%s> (Flags: <%s>)
+0x02102 = %s: Name: <%s> Wert: <%s>
 
 # Modul PORTOFOLIO
-0x02201 = Kein Kurs ermittelbar (POS_QUANTITY: <%s:%s> POS_BUY_PRICE: <%s:%s>)!
+0x02201 = Lese Portofoliodatei <%s>
+0x02202 = Lese aus Portofoliodatei <%s> Portofolio <%s>
+0x02203 = Lese aus Portofoliodatei <%s> aus Portofolio <%s> Position <%s>
+0x02204 = Verarbeite aus Portofolio <%s> Position <%s> : <%s>
+0x02205 = Verarbeite Werte aus Portofolio <%s> aus Position <%s>: Currency <%s>  Quantity <%s>  Buy_Price <%s>  Dividende <%s>  Branche <%s> 
+0x02206 = Aufsummierte Werte aus Portofolio <%s> aus Position <%s>: <%s> 
+0x0220f = Kein Kurs ermittelbar (POS_QUANTITY: <%s:%s> POS_BUY_PRICE: <%s:%s>)!
+0x02299 = %s %s %s %s
+
+# Modul schreibe_Ausgabe
+0x02501 = Schreibe Ausgabe für Depot <%s> nach Datei <%s>
 
 # Benutzedefinierte Meldungen
 # 0x10000-0xfffff
