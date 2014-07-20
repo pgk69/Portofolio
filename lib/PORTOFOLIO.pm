@@ -522,7 +522,7 @@ sub lese_Portofolios {
         }
         if ($self->{SumPos} && $#stockattributearray) {
           # Falls gewuenscht, Aufsummieren aller Einzelpositionen so, dass am Ende nur noch eine Arrayelement mit allen aufsummierten Positionen uebrig bleibt
-          my ($Currency, $Buy_Price, $Quantity, $Dividende, $Branche) = ('', 0, 0, 0, '');
+          my ($Currency, $Buy_Price, $Quantity, $Dividende, $Branche, $Kurs) = ('', 0, 0, 0, '', 0);
           while ($#stockattributearray >= 0) {
             my @stockattribute = split('\|', shift(@stockattributearray));
             Trace->Trc('I', 3, 0x02205, $portofolioname, $pos, $stockattribute[0] || '', $stockattribute[1] || '', $stockattribute[2] || '', $stockattribute[3] || '', $stockattribute[4] || '');
@@ -531,8 +531,9 @@ sub lese_Portofolios {
             $Buy_Price += $stockattribute[2] || 0;
             $Dividende = $stockattribute[3] || $Dividende || 0;
             $Branche   = $stockattribute[4] || $Branche   || '';
+            $Kurs      = $stockattribute[5] || $Kurs      || 0;
           }
-          $stockattributearray[0] = join('|', ($Currency, $Quantity, $Buy_Price, $Dividende, $Branche));
+          $stockattributearray[0] = join('|', ($Currency, $Quantity, $Buy_Price, $Dividende, $Branche, $Kurs));
           Trace->Trc('I', 2, 0x02206, $portofolioname, $pos, $Quantity);
         } ## end if ($self->{SumPos} &&...)
         my $poscount = 0;
@@ -540,11 +541,13 @@ sub lese_Portofolios {
           my @stockattribute = split('\|', $exg_anz_prz);
           $poscount++;
           my $ppos = "$pos $poscount";
-          $self->{Kurs}{$pos}{_Waehrung} = $stockattribute[0] || 'EUR';
+          $self->{Kurs}{$pos}{_Waehrung}                              = $stockattribute[0] || 'EUR';
+          $self->{Kurs}{$pos}{_l1}                                    = 0;
           $self->{Portofolios}{$portofolioname}{$ppos}{Pos_Quantity}  = $stockattribute[1];
           $self->{Portofolios}{$portofolioname}{$ppos}{Pos_Buy_Price} = $stockattribute[2];
           $self->{Portofolios}{$portofolioname}{$ppos}{Pos_Dividende} = $stockattribute[3] || 0;
           $self->{Portofolios}{$portofolioname}{$ppos}{Pos_Branche}   = $stockattribute[4] || '';
+          $self->{Kurs}{$pos}{_l1}                                    = $stockattribute[5] if (defined($stockattribute[5]) && $stockattribute[5] =~ m/^([-+]?)([0-9]*).*$/);
           
           if (looks_like_number($self->{Portofolios}{$portofolioname}{$ppos}{Pos_Quantity}) && 
               $self->{Portofolios}{$portofolioname}{$ppos}{Pos_Quantity} && 
@@ -564,6 +567,9 @@ sub lese_Portofolios {
     my @symbols = split('\|', $_);
     while ((my $symbol = shift(@symbols)) && !($self->{Kurs}{$_}{l1})) {
       $self->_webabruf($symbol, $self->{Kurs}{$_}, keys %{$self->{Flags}});
+      if ($self->{Kurs}{$_}{_l1}) {
+        $self->{Kurs}{$_}{l1} = $self->{Kurs}{$_}{_l1}
+      }
     }
   }
   Trace->Trc('S', 1, 0x00002, $self->{subroutine});
