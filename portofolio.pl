@@ -107,6 +107,7 @@ if ($@) {
 # PRGRAMM-Start
 #-------------------------------------------------------------------------------
 $prg->lese_Portofolios(CmdLine->argument());
+$prg->Kurse_ermitteln();
 $prg->analysiere_Portofolios();
 $prg->schreibe_Ausgabe();
 

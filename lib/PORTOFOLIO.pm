@@ -68,6 +68,7 @@ use Term::ANSIColor;
 use File::Copy;
 use FindBin qw($Bin $Script $RealBin $RealScript);
 use Storable;
+use Finance::Quote;
 
 #
 # Konstantendefinition
@@ -162,8 +163,10 @@ sub _init {
   # DB-Zugriff
 
   # Web-Abfrage
-  Trace->Exit(1, 0, 0x0f009, 'Stockservice', 'URL') if (!defined(Configuration->config('Stockservice', 'URL')));
-  Trace->Exit(1, 0, 0x0f009, 'Stockinfos') if (!defined(Configuration->config('Stockinfos')));
+  if (Configuration->config('Stockservice', 'Source') eq 'YAHOO') {
+    Trace->Exit(1, 0, 0x0f009, 'Stockservice', 'URL') if (!defined(Configuration->config('Stockservice', 'URL')));
+    Trace->Exit(1, 0, 0x0f009, 'Stockinfos') if (!defined(Configuration->config('Stockinfos')));
+  }
 
   # Ergebnisausgabe und Sicherung
   if (Configuration->config('Prg', 'LockFile')) {
@@ -232,6 +235,13 @@ sub _init {
     $self->{Testkurs} = $Testkurs;
   }
 
+  # Maximales Alter von Kursinfos
+  $self->{MaxDelay} = Configuration->config('Stockservice', 'MaxDelay') || 86400;
+
+  # Differenz uzu UTC
+  $self->{UTCDelta} = Configuration->config('Stockservice', 'UTCDelte') || +0100;
+
+
 } ## end sub _init
 
 
@@ -264,7 +274,7 @@ sub DESTROY {
 } ## end sub DESTROY
 
 
-sub _webabruf {
+sub _webabruf_YAHOO {
   #################################################################
   # Durchfuehren eines Webabrufs
 
@@ -285,7 +295,7 @@ sub _webabruf {
 
   my $rc = 0;
 
-  if (!$$hashptr{_aktuell} && (!$$hashptr{_letzter_Abruf} || ($$hashptr{_letzter_Abruf} < time - 3600))) {
+  if (!$$hashptr{_aktuell} && (!$$hashptr{_letzter_Abruf} || ($$hashptr{_letzter_Abruf} < time - $self->{MaxDelay}))) {
     push(@flags, ('l1', 'd1', 't1'));
     my %unique = ();
     $unique{$_} = 0 for @flags;
@@ -329,7 +339,7 @@ sub _webabruf {
                       $self->{Kurs}{$curxchg}{l1} = $$hashptr{_Waehrung};
                     } elsif ($$hashptr{_Waehrung} =~ /^[A-Za-z][A-Za-z0-9]{2}/) {
                       # Standardwaehrung -> Wechselkurs wird ermittelt
-                      $self->_webabruf($curxchg, $self->{Kurs}{$curxchg});
+                      $self->_webabruf_YAHOO($curxchg, $self->{Kurs}{$curxchg});
                       # Normalisieren des Wertes
                       $self->{Kurs}{$curxchg}{l1} *= 1;
                       # Fuer GBP ist ein weiterer Faktor 100 noetig
@@ -365,8 +375,7 @@ sub _webabruf {
       if ($tradetime < str2time(time2str('%x', time))) {
 
         # $$hashptr{_Tradetime} .= '<';
-        $$hashptr{_aktuell} =
-          ($$hashptr{_letzter_Abruf} && $$hashptr{_letzter_Abruf} < time - 3600) ? 0 : 1;
+        $$hashptr{_aktuell} = ($$hashptr{_letzter_Abruf} && $$hashptr{_letzter_Abruf} < time - $self->{MaxDelay}) ? 0 : 1;
       } else {
         $$hashptr{_aktuell} = 1;
       }
@@ -393,7 +402,185 @@ sub _webabruf {
   $self->{subroutine} = $merker;
 
   return $rc;
-} ## end sub _webabruf
+} ## end sub _webabruf_YAHOO
+
+
+sub _webabruf_QUOTE {
+  #################################################################
+  # Durchfuehren eines Webabrufs
+
+  #
+  # Prozedurnummer 1
+  #
+  my $self = shift;
+
+  my $merker = $self->{subroutine};
+  $self->{subroutine} = (caller(0))[3];
+  Trace->Trc('S', 3, 0x00001, $self->{subroutine}, $self->{Eingabedatei});
+
+  my $symbol  = shift;
+  my $hashptr = shift;
+  my $infoptr = shift;
+
+  no autovivification;
+
+  my $rc = 0;
+
+  my @labels = (["n",  "name",      "%45s",   20, ''], # name n      = Name 0 %-20s
+                ["x",  "exchange",  "%30s",   10, ''], # exchange x  = Stock_Exchange 0 %-10s
+                ["d1", "date",      "%11s",   10, ''], # date d1     = Last_Trade_Date 0 %10s
+                ["t1", "time",      "%10s",    7, ''], # time t1     = Last_Trade_Time 0 %7s
+                ["l1", "last",      "%8.2f",   7, 0],  # last l1     = Last_Trade_Price 1 %7.2f
+                ["c1", "net",       "%7.2f",   7, 0],  # net c1      = Change 1 %+7.2f
+                ["p2", "p_change",  "%10.2f",  5, 0],  # p_change p2 = Change_Percent 0 %+5.2f
+                ["y",  "div_yield", "%10.2f",  6, 0],  # div_yield y = Dividend_Yield 0 %5.2f
+                ["d",  "div",       "%10.2f",  5, 0]); # div d       = Dividend_per_Share 1 %6.2f
+               
+  my %value;
+  foreach my $tuple (@labels) {
+    my ($key, $name, undef, $width, $default) = @$tuple;
+    Trace->Trc('I', 2, 0x02102, $symbol, $name, $$infoptr{$symbol, $name});
+    
+    $value{$key} = defined($$infoptr{$symbol, $name}) ? substr($$infoptr{$symbol, $name}, 0, $width) : $default;
+  }
+  $value{s}  = substr($symbol, 0, 11);               # symbol s    = Symbol 0 %-10s
+
+  my $tradetime = 0;
+  if ($value{d1} && $value{t1}) {
+    $tradetime = str2time("$value{d1} $value{t1} $self->{UTCDelta}") || 0;
+  }
+  
+  if (!defined($$hashptr{_tradetime}) || ($tradetime > $$hashptr{_tradetime})) {
+    $$hashptr{_aktuell} = 0;
+
+    foreach my $flag (keys(%value)) {
+      $$hashptr{$flag . '_RAW'} = $value{$flag};
+      $$hashptr{$flag} = ($flag ne 's') ? $value{$flag} : (split(/\./, $value{$flag}))[0];
+    } ## end if (defined($flag))
+
+    if ($tradetime) {
+      $$hashptr{_tradetime} = $tradetime;
+      $$hashptr{_Tradetime} = time2str('%d.%m.%y %R', $$hashptr{_tradetime});
+      $$hashptr{_lastTrade} = abs((str2time(time2str('%x', time)) - str2time(time2str('%x', $tradetime))) / 86400);
+
+#    if ($tradetime < str2time(time2str('%x', time))) {
+      if ($tradetime < time - $self->{MaxDelay}) {
+
+        $$hashptr{_aktuell} = ($$hashptr{_letzter_Abruf} && $$hashptr{_letzter_Abruf} < time - $self->{MaxDelay}) ? 0 : 1;
+      } else {
+        $$hashptr{_aktuell} = 1;
+      }
+      $$hashptr{_letzter_Abruf} = time;
+    } else {
+      $$hashptr{_Tradetime} = 0;
+    }
+
+    if ($$hashptr{n}) {
+      $$hashptr{n} =~ s/\s+N$//
+    }
+  }
+
+
+  Trace->Trc('I', 2, 0x02102, $symbol, $$hashptr{n}, $$hashptr{l1});
+
+  $/ = $crlfmerker;
+
+  # Kursinfos speichern
+  if (exists($self->{VarFile})) {
+    store $self->{Kurs}, $self->{VarFile};
+  }
+
+  Trace->Trc('S', 3, 0x00002, $self->{subroutine});
+  $self->{subroutine} = $merker;
+
+  return $rc;
+} ## end if (!$$hashptr{_aktuell...})
+
+
+sub Kurse_ermitteln {
+  #################################################################
+  # Ermittelt Kurse zu allen PApieren, die in den Depots gefunden 
+  # wurden
+  # Ergebnis: In der Datenstruktur $self->{Kurse} liegt
+  # ein Hash (Portofolios) von Hashes (Position) mit:
+  #
+  # Pos_Quantity          : Amount of Shares in Position
+
+  # Pos_Buy_Price         : Buying Price of whole Position
+  # Share_Buy_Price       : Buying Price for one Share
+
+  #
+  # Prozedurnummer 2
+  #
+  my $self = shift;
+  my $singleportofolio = shift || '';
+
+  my $merker = $self->{subroutine};
+  $self->{subroutine} = (caller(0))[3];
+  Trace->Trc('S', 1, 0x00001, $self->{subroutine}, $self->{Eingabedatei});
+
+  my $rc = 0;
+
+  # Kurs ermitteln
+  # Methode YAHOO
+  if (Configuration->config('Stockservice', 'Source') eq 'YAHOO') {
+    foreach (sort keys %{$self->{Kurs}}) {
+      my @symbols = split('\|', $_);
+      while ((my $symbol = shift(@symbols)) && !($self->{Kurs}{$_}{l1})) {
+        # Fuer jedes Symbol den Abruf machen sofern noch kein Kurs feststeht
+        $self->_webabruf_YAHOO($symbol, $self->{Kurs}{$_}, keys %{$self->{Flags}});
+        if ($self->{Kurs}{$_}{_l1}) {
+          $self->{Kurs}{$_}{l1} = $self->{Kurs}{$_}{_l1}
+        }
+      }
+    }
+  }
+
+  # Methode Finance::Quote
+  if (Configuration->config('Stockservice', 'Source') eq 'Finance::Quote') {
+    my $quoter = Finance::Quote->new();
+    $quoter->set_currency(EUR);  # Set default currency.
+    
+    # Array ueber alle Symbole erstellen
+    my @markets = split(' ', Configuration->config('Stockservice', 'Markets'));
+    if (!@markets) {@markets = (qw/vwd europe/)};
+    my @symbols;
+    my %symbolhash;
+    foreach (keys %{$self->{Kurs}}) {
+      foreach my $symbol (split('\|', $_)) {
+        $symbolhash{$symbol} = $_
+      }
+    }
+    foreach (sort keys %symbolhash) {
+      push(@symbols, $_) if (!$self->{Kurs}{$symbolhash{$_}}{_aktuell})
+    }
+
+    foreach my $exchange (@markets) {
+      if (scalar(@symbols)) {
+        Trace->Trc('I', 2, 0x02101, $exchange, join(' ', @symbols));
+        my %info = $quoter->fetch($exchange, @symbols);
+
+        # Ergebnisse auswerten und @symbol aktualisieren
+        foreach my $symbol (@symbols) {
+          next unless $info{$symbol,"success"}; # Skip failures.
+          next unless $info{$symbol,"last"} ne '0,00'; # Skip failures.
+          $self->_webabruf_QUOTE($symbol, $self->{Kurs}{$symbolhash{$symbol}}, \%info);
+        }
+        # Remove the symbols I already got a current info
+        undef %info;
+        undef @symbols;
+        foreach (sort keys %symbolhash) {
+          push(@symbols, $_) if (!$self->{Kurs}{$symbolhash{$_}}{_aktuell})
+        }
+      }
+    }
+  }
+
+  Trace->Trc('S', 1, 0x00002, $self->{subroutine});
+  $self->{subroutine} = $merker;
+
+  return $rc;
+} ## end sub Kurse_ermitteln
 
 
 sub lese_Portofolios {
@@ -408,7 +595,7 @@ sub lese_Portofolios {
   # Share_Buy_Price       : Buying Price for one Share
 
   #
-  # Prozedurnummer 2
+  # Prozedurnummer 3
   #
   my $self = shift;
   my $singleportofolio = shift || '';
@@ -562,16 +749,6 @@ sub lese_Portofolios {
     } ## end if (scalar keys %{$portofolios...})
   } ## end foreach my $portofolioname ...
 
-  # Kurs ermitteln
-  foreach (sort keys %{$self->{Kurs}}) {
-    my @symbols = split('\|', $_);
-    while ((my $symbol = shift(@symbols)) && !($self->{Kurs}{$_}{l1})) {
-      $self->_webabruf($symbol, $self->{Kurs}{$_}, keys %{$self->{Flags}});
-      if ($self->{Kurs}{$_}{_l1}) {
-        $self->{Kurs}{$_}{l1} = $self->{Kurs}{$_}{_l1}
-      }
-    }
-  }
   Trace->Trc('S', 1, 0x00002, $self->{subroutine});
   $self->{subroutine} = $merker;
 
