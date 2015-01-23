@@ -5,7 +5,7 @@ package PORTOFOLIO;
 #                       $Revision: 853 $
 #                       $Author: xck90n1 $
 #
-# Aufgabe:				- Ausfuehrbarer Code von programm.pl
+# Aufgabe:				 - Ausfuehrbarer Code von programm.pl
 #
 # $Id: PROGRAMM.pm 853 2012-06-04 13:53:45Z xck90n1 $
 # $URL: https://svn.fiducia.de/svn/multicom/trunk/multicom/Framework%20OO/lib/PROGRAMM.pm $
@@ -223,10 +223,14 @@ sub _init {
   my %flags;
 
   foreach (keys %stockInfos) {
-    my ($info, $faktor, @format) = split(' ', $stockInfos{$_});
-    $flags{$_} = {Flag   => $info,
-                  Faktor => $faktor || 0,
-                  Format => join(' ', @format) || '%s'};
+    my ($name, $info, $faktor, $laenge, $default, @format) = split(' ', $stockInfos{$_});
+    if ($default eq '-') {$default = ' '}
+    $flags{$_} = {Abbr    => $name,
+                  Flag    => $info,
+                  Faktor  => $faktor || 0,
+                  Laenge  => $laenge,
+                  Default => $default,
+                  Format  => join(' ', @format) || '%s'};
   }
 
   $self->{Flags} = \%flags;
@@ -289,21 +293,21 @@ sub _webabruf_YAHOO {
 
   my $symbol  = shift;
   my $hashptr = shift;
-  my @flags   = @_;
+  my $flagptr = shift;
 
   no autovivification;
 
   my $rc = 0;
 
   if (!$$hashptr{_aktuell} && (!$$hashptr{_letzter_Abruf} || ($$hashptr{_letzter_Abruf} < time - $self->{MaxDelay}))) {
-    push(@flags, ('l1', 'd1', 't1'));
+    push(@$flagptr, ('last', 'date', 'time'));
     my %unique = ();
-    $unique{$_} = 0 for @flags;
-    @flags = sort(keys %unique);
+    $unique{$_} = 0 for @$flagptr;
+    my @flags = sort(keys %unique);
 
     Trace->Trc('I', 2, 0x02101, $symbol, join('', @flags));
 
-    my (@myFlags, $flag, $stockdata, $wert);
+    my (@myFlags, $flag, $flagname, $stockdata, $wert);
 
     my $webAbruf = Utils::extendString(Configuration->config('Stockservice', 'URL'), 'STOCK|' . $symbol . '|DATA|' . join('', @flags));
     my $maxtry = Configuration->config('Stockservice', 'Anzahl_Versuche') || 10;
@@ -321,54 +325,56 @@ sub _webabruf_YAHOO {
         while ($stockdata =~ /\"[\s0]*([^\"]+?)[\s]*\"|[\s0]*([^,\s]+)/g) {
           chomp($wert = $1 ? $1 : $2);
           $wert = 0 if ($wert eq 'N/A');
-          $flag = shift(@myFlags);
+#          $flag = shift(@myFlags);
+          $flagname = shift(@myFlags);
+          $flag     = $self->{Flags}{$flagname}{Abbr};
           if (defined($flag)) {
             # Sichern des Originalwertes
-            $$hashptr{$flag . '_RAW'} = $wert;
-            if ($self->{Flags}{$flag}{Faktor} && $$hashptr{_Waehrung}) {
-              if ($self->{Flags}{$flag}{Faktor} == 1) {
+            if ($self->{Flags}{$flagname}{Faktor}) {$$hashptr{$flagname . '_RAW'} = $wert}
+            if ($self->{Flags}{$flagname}{Faktor} && $$hashptr{_Waehrung}) {
+              if ($self->{Flags}{$flagname}{Faktor} == 1) {
                 my $curxchg = 'EUR' . $$hashptr{_Waehrung} . '=X';
                 # Falls der Wechselkurs fuer die Waehrung noch nicht ermittelt ist,
                 # versuchen wir das
-                if (!$self->{Kurs}{$curxchg}{l1}) {
+                if (!$self->{Kurs}{$curxchg}{last}) {
                   # Default -> Wechselkurs 1
-                  $self->{Kurs}{$curxchg}{l1} = 1;
+                  $self->{Kurs}{$curxchg}{last} = 1;
                   if ($$hashptr{_Waehrung} ne 'EUR') {
                     if ($$hashptr{_Waehrung} =~ /^[0-9.,]+/) {
                       # Keine Standardwaehrung -> Wechselkurs wird direkt angegeben
-                      $self->{Kurs}{$curxchg}{l1} = $$hashptr{_Waehrung};
+                      $self->{Kurs}{$curxchg}{last} = $$hashptr{_Waehrung};
                     } elsif ($$hashptr{_Waehrung} =~ /^[A-Za-z][A-Za-z0-9]{2}/) {
                       # Standardwaehrung -> Wechselkurs wird ermittelt
                       $self->_webabruf_YAHOO($curxchg, $self->{Kurs}{$curxchg});
                       # Normalisieren des Wertes
-                      $self->{Kurs}{$curxchg}{l1} *= 1;
+                      $self->{Kurs}{$curxchg}{last} *= 1;
                       # Fuer GBP ist ein weiterer Faktor 100 noetig
-                      $self->{Kurs}{$curxchg}{l1} *= 100 if ($$hashptr{_Waehrung} eq 'GBP');
+                      $self->{Kurs}{$curxchg}{last} *= 100 if ($$hashptr{_Waehrung} eq 'GBP');
                     }
                   } ## end if ($$hashptr{_Waehrung...})
                 } ## end if (!$self->{Kurs}{$curxchg...})
 
                 # Der Wert in EUR wird nur ermittelt, falls ein Wechselkurs existiert
-                $wert = $wert / $self->{Kurs}{$curxchg}{l1} if ($self->{Kurs}{$curxchg}{l1});
+                $wert = $wert / $self->{Kurs}{$curxchg}{last} if ($self->{Kurs}{$curxchg}{last});
               } else {
                 $wert = $wert * $self->{Flags}{$flag}{Faktor};
               }
             } ## end if ($self->{Flags}{$flag...})
             # Sichern des faktorisierten Wertes
-            $$hashptr{$flag} = ($flag ne 's') ? $wert : (split(/\./, $wert))[0];
+            $$hashptr{$flagname} = ($flagname ne 'symbol') ? $wert : (split(/\./, $wert))[0];
           } ## end if (defined($flag))
         } ## end while ($stockdata =~ /\"[\s0]*([^\"]+?)[\s]*\"|[\s0]*([^,\s]+)/g)
       } ## end if (defined($stockdata...))
       $maxtry--;
     }
-    until ($maxtry <= 0 || ($$hashptr{l1} &&
-                            $$hashptr{l1} ne 'N/A' &&
-                            $$hashptr{l1} > 0 &&
-                            $$hashptr{l1} <= 1000000 &&
-                            $$hashptr{l1} != 1));
+    until ($maxtry <= 0 || ($$hashptr{last} &&
+                            $$hashptr{last} ne 'N/A' &&
+                            $$hashptr{last} > 0 &&
+                            $$hashptr{last} <= 1000000 &&
+                            $$hashptr{last} != 1));
 
-    if ($$hashptr{d1} && $$hashptr{t1}) {
-      my $tradetime = str2time("$$hashptr{d1} $$hashptr{t1}", $self->{TZ}) || 0;
+    if ($$hashptr{date} && $$hashptr{'time'}) {
+      my $tradetime = str2time("$$hashptr{date} $$hashptr{'time'}", $self->{TZ}) || 0;
       $$hashptr{_Tradetime} = time2str('%d.%m.%y %R', $tradetime);
       $$hashptr{_lastTrade} = abs((str2time(time2str('%x', time)) - str2time(time2str('%x', $tradetime))) / 86400);
 
@@ -384,11 +390,11 @@ sub _webabruf_YAHOO {
       $$hashptr{_Tradetime} = 0;
     }
 
-    if ($$hashptr{n}) {
-      $$hashptr{n} =~ s/\s+N$//
+    if ($$hashptr{name}) {
+      $$hashptr{name} =~ s/\s+N$//
     }
 
-    Trace->Trc('I', 2, 0x02102, $symbol, $$hashptr{n}, $$hashptr{l1});
+    Trace->Trc('I', 2, 0x02102, $symbol, $$hashptr{name}, $$hashptr{last});
 
     $/ = $crlfmerker;
   } ## end if (!$$hashptr{_aktuell...})
@@ -421,67 +427,69 @@ sub _webabruf_QUOTE {
   my $symbol  = shift;
   my $hashptr = shift;
   my $infoptr = shift;
+  my $quelle  = shift;
 
   no autovivification;
 
   my $rc = 0;
 
-  my @labels = (["n",  "name",      "%45s",   20, ''], # name n      = Name 0 %-20s
-                ["x",  "exchange",  "%30s",   10, ''], # exchange x  = Stock_Exchange 0 %-10s
-                ["d1", "date",      "%11s",   10, ''], # date d1     = Last_Trade_Date 0 %10s
-                ["t1", "time",      "%10s",    7, ''], # time t1     = Last_Trade_Time 0 %7s
-                ["l1", "last",      "%8.2f",   7, 0],  # last l1     = Last_Trade_Price 1 %7.2f
-                ["c1", "net",       "%7.2f",   7, 0],  # net c1      = Change 1 %+7.2f
-                ["p2", "p_change",  "%10.2f",  5, 0],  # p_change p2 = Change_Percent 0 %+5.2f
-                ["y",  "div_yield", "%10.2f",  6, 0],  # div_yield y = Dividend_Yield 0 %5.2f
-                ["d",  "div",       "%10.2f",  5, 0]); # div d       = Dividend_per_Share 1 %6.2f
-               
   my %value;
-  foreach my $tuple (@labels) {
-    my ($key, $name, undef, $width, $default) = @$tuple;
-    Trace->Trc('I', 2, 0x02102, $symbol, $name, $$infoptr{$symbol, $name});
-    
-    $value{$key} = defined($$infoptr{$symbol, $name}) ? substr($$infoptr{$symbol, $name}, 0, $width) : $default;
+  foreach (keys %{$self->{Flags}}) {
+    Trace->Trc('I', 2, 0x02102, $symbol, $_, $$infoptr{$symbol, $_});
+    if (defined($$infoptr{$symbol, $_})) {
+      $value{$_} = substr($$infoptr{$symbol, $_}, 0, $self->{Flags}{$_}{Laenge})
+    } else {
+      $value{$_} = $self->{Flags}{$_}{Default};
+    }
   }
-  $value{s}  = substr($symbol, 0, 11);               # symbol s    = Symbol 0 %-10s
 
   my $tradetime = 0;
-  if ($value{d1} && $value{t1}) {
-    $tradetime = str2time("$value{d1} $value{t1} $self->{UTCDelta}") || 0;
+  if ($value{date} && $value{'time'}) {
+    $tradetime = str2time("$value{date} $value{'time'}") || 0;
   }
   
   if (!defined($$hashptr{_tradetime}) || ($tradetime > $$hashptr{_tradetime})) {
     $$hashptr{_aktuell} = 0;
 
-    foreach my $flag (keys(%value)) {
-      $$hashptr{$flag . '_RAW'} = $value{$flag};
-      $$hashptr{$flag} = ($flag ne 's') ? $value{$flag} : (split(/\./, $value{$flag}))[0];
+    foreach my $flagname (keys(%value)) {
+      $value{$flagname} =~ s/^\s+|\s+$//g;
+      if ($self->{Flags}{$flagname}{Faktor}) {
+        $$hashptr{$flagname . '_RAW'} = $value{$flagname}
+      }
+      $$hashptr{$flagname} = ($flagname ne 'symbol') ? $value{$flagname} : (split(/\./, $value{$flagname}))[0];
     } ## end if (defined($flag))
 
     if ($tradetime) {
       $$hashptr{_tradetime} = $tradetime;
-      $$hashptr{_Tradetime} = time2str('%d.%m.%y %R', $$hashptr{_tradetime});
+      $$hashptr{_Tradetime} = time2str('%d.%m.%y %R', $$hashptr{_tradetime} + $self->{UTCDelta});
       $$hashptr{_lastTrade} = abs((str2time(time2str('%x', time)) - str2time(time2str('%x', $tradetime))) / 86400);
+      $$hashptr{_aktuell} = 1;
 
-#    if ($tradetime < str2time(time2str('%x', time))) {
-      if ($tradetime < time - $self->{MaxDelay}) {
+#      if (($tradetime > (str2time(gmtime()) - $self->{MaxDelay})) ||
+#          (defined($$hashptr{_letzter_Abruf}) && ($$hashptr{_letzter_Abruf} > (str2time(gmtime()) - $self->{MaxDelay})))) {
+#        $$hashptr{_aktuell} = 1;
+#      }
 
-        $$hashptr{_aktuell} = ($$hashptr{_letzter_Abruf} && $$hashptr{_letzter_Abruf} < time - $self->{MaxDelay}) ? 0 : 1;
-      } else {
-        $$hashptr{_aktuell} = 1;
-      }
-      $$hashptr{_letzter_Abruf} = time;
+      $$hashptr{_letzter_Abruf} = str2time(gmtime());
     } else {
       $$hashptr{_Tradetime} = 0;
     }
 
-    if ($$hashptr{n}) {
-      $$hashptr{n} =~ s/\s+N$//
+    if ($$hashptr{name}) {
+      $$hashptr{name} =~ s/\s+N$//
+    }
+
+    if (!defined($$hashptr{symbol}) || ($$hashptr{symbol} eq '')) {
+      $$hashptr{symbol} = $symbol;
+    }
+
+    if (!defined($$hashptr{exchange}) || ($$hashptr{exchange} eq '')) {
+      $$hashptr{exchange} = $quelle;
     }
   }
 
 
-  Trace->Trc('I', 2, 0x02102, $symbol, $$hashptr{n}, $$hashptr{l1});
+  Trace->Trc('I', 2, 0x02102, $symbol, $$hashptr{name}, $$hashptr{last});
 
   $/ = $crlfmerker;
 
@@ -526,11 +534,11 @@ sub Kurse_ermitteln {
   if (Configuration->config('Stockservice', 'Source') eq 'YAHOO') {
     foreach (sort keys %{$self->{Kurs}}) {
       my @symbols = split('\|', $_);
-      while ((my $symbol = shift(@symbols)) && !($self->{Kurs}{$_}{l1})) {
+      while ((my $symbol = shift(@symbols)) && !($self->{Kurs}{$_}{last})) {
         # Fuer jedes Symbol den Abruf machen sofern noch kein Kurs feststeht
-        $self->_webabruf_YAHOO($symbol, $self->{Kurs}{$_}, keys %{$self->{Flags}});
-        if ($self->{Kurs}{$_}{_l1}) {
-          $self->{Kurs}{$_}{l1} = $self->{Kurs}{$_}{_l1}
+        $self->_webabruf_YAHOO($symbol, $self->{Kurs}{$_}, \(keys %{$self->{Flags}}));
+        if ($self->{Kurs}{$_}{_last}) {
+          $self->{Kurs}{$_}{last} = $self->{Kurs}{$_}{_last}
         }
       }
     }
@@ -548,29 +556,45 @@ sub Kurse_ermitteln {
     my %symbolhash;
     foreach (keys %{$self->{Kurs}}) {
       foreach my $symbol (split('\|', $_)) {
-        $symbolhash{$symbol} = $_
+        $symbolhash{$symbol} = $_;
+        my $waehrung = 'EUR' . $self->{Kurs}{$_}{_Waehrung} . '=X';
+        $symbolhash{$waehrung} = $waehrung;
+        $self->{Kurs}{$waehrung}{_Waehrung} = $self->{Kurs}{$_}{_Waehrung};
+        $self->{Kurs}{$waehrung}{_last}     = 0;
       }
     }
     foreach (sort keys %symbolhash) {
       push(@symbols, $_) if (!$self->{Kurs}{$symbolhash{$_}}{_aktuell})
     }
 
-    foreach my $exchange (@markets) {
+    foreach my $quelle (@markets) {
       if (scalar(@symbols)) {
-        Trace->Trc('I', 2, 0x02101, $exchange, join(' ', @symbols));
-        my %info = $quoter->fetch($exchange, @symbols);
+        Trace->Trc('I', 2, 0x02101, $quelle, join(' ', @symbols));
+        my %info = $quoter->fetch($quelle, @symbols);
 
         # Ergebnisse auswerten und @symbol aktualisieren
         foreach my $symbol (@symbols) {
           next unless $info{$symbol,"success"}; # Skip failures.
           next unless $info{$symbol,"last"} ne '0,00'; # Skip failures.
-          $self->_webabruf_QUOTE($symbol, $self->{Kurs}{$symbolhash{$symbol}}, \%info);
+          $self->_webabruf_QUOTE($symbol, $self->{Kurs}{$symbolhash{$symbol}}, \%info, $quelle);
         }
         # Remove the symbols I already got a current info
         undef %info;
         undef @symbols;
         foreach (sort keys %symbolhash) {
           push(@symbols, $_) if (!$self->{Kurs}{$symbolhash{$_}}{_aktuell})
+        }
+      }
+    }
+    foreach my $symbol (keys %{$self->{Kurs}}) {
+      if ($self->{Kurs}{$symbol}{_Waehrung} ne 'EUR') {
+        foreach my $EUR (keys %{$self->{Kurs}{$symbol}}) {
+          if (defined($self->{Kurs}{$symbol}{$EUR . '_RAW'})) {
+            my $xsymbol = 'EUR' . $self->{Kurs}{$symbol}{_Waehrung} . '=X';
+            if ($self->{Kurs}{$xsymbol}{last}) {
+              $self->{Kurs}{$symbol}{$EUR . '_RAW'} = $self->{Kurs}{$symbol}{$EUR} * $self->{Kurs}{$xsymbol}{last}
+            }
+          }
         }
       }
     }
@@ -729,12 +753,12 @@ sub lese_Portofolios {
           $poscount++;
           my $ppos = "$pos $poscount";
           $self->{Kurs}{$pos}{_Waehrung}                              = $stockattribute[0] || 'EUR';
-          $self->{Kurs}{$pos}{_l1}                                    = 0;
+          $self->{Kurs}{$pos}{_last}                                  = 0;
           $self->{Portofolios}{$portofolioname}{$ppos}{Pos_Quantity}  = $stockattribute[1];
           $self->{Portofolios}{$portofolioname}{$ppos}{Pos_Buy_Price} = $stockattribute[2];
           $self->{Portofolios}{$portofolioname}{$ppos}{Pos_Dividende} = $stockattribute[3] || 0;
           $self->{Portofolios}{$portofolioname}{$ppos}{Pos_Branche}   = $stockattribute[4] || '';
-          $self->{Kurs}{$pos}{_l1}                                    = $stockattribute[5] if (defined($stockattribute[5]) && $stockattribute[5] =~ m/^([-+]?)([0-9]*).*$/);
+          $self->{Kurs}{$pos}{_last}                                  = $stockattribute[5] if (defined($stockattribute[5]) && $stockattribute[5] =~ m/^([-+]?)([0-9]*).*$/);
           
           if (looks_like_number($self->{Portofolios}{$portofolioname}{$ppos}{Pos_Quantity}) && 
               $self->{Portofolios}{$portofolioname}{$ppos}{Pos_Quantity} && 
@@ -796,7 +820,7 @@ sub analysiere_Portofolios {
   
   sub spf ($$) {
     my $format = $_[0];
-    my $text   = $_[1];
+    my $text   = $_[1] || 0;
 
     my $len = 5;
     if ($format =~ m/^%([-+]?)([0-9]*).*$/) {
@@ -822,16 +846,20 @@ sub analysiere_Portofolios {
   foreach my $depot (keys %{$self->{Portofolios}}) {
     foreach my $pos (keys %{$self->{Portofolios}{$depot}}) {
       if (my $symbol = (split(' ', $pos))[0]) {
-        if ($self->{Kurs}{$symbol}{l1}) {
+        if ($self->{Kurs}{$symbol}{last}) {
 
           # Werte ermitteln
-          $self->{Portofolios}{$depot}{$pos}{Pos_Price}              = $self->{Portofolios}{$depot}{$pos}{Pos_Quantity} * $self->{Kurs}{$symbol}{l1} || 0;
-          $self->{Portofolios}{$depot}{$pos}{Pos_Day_Change}         = $self->{Portofolios}{$depot}{$pos}{Pos_Quantity} * $self->{Kurs}{$symbol}{c1} || 0;
-          $self->{Portofolios}{$depot}{$pos}{Pos_Day_Change_Percent} = $self->{Kurs}{$symbol}{p2};
+          $self->{Portofolios}{$depot}{$pos}{Pos_Price}              = $self->{Portofolios}{$depot}{$pos}{Pos_Quantity} * $self->{Kurs}{$symbol}{last} || 0;
+          $self->{Portofolios}{$depot}{$pos}{Pos_Day_Change}         = $self->{Portofolios}{$depot}{$pos}{Pos_Quantity} * $self->{Kurs}{$symbol}{net} || 0;
+          $self->{Portofolios}{$depot}{$pos}{Pos_Day_Change_Percent} = $self->{Kurs}{$symbol}{p_change};
           $self->{Portofolios}{$depot}{$pos}{Pos_Change}             = $self->{Portofolios}{$depot}{$pos}{Pos_Price} - $self->{Portofolios}{$depot}{$pos}{Pos_Buy_Price};
-          $self->{Portofolios}{$depot}{$pos}{Pos_Change_Percent}     = 100 * $self->{Portofolios}{$depot}{$pos}{Pos_Change} / $self->{Portofolios}{$depot}{$pos}{Pos_Buy_Price};
-          $self->{Portofolios}{$depot}{$pos}{Pos_Div_Summe}          = $self->{Portofolios}{$depot}{$pos}{Pos_Quantity} * $self->{Kurs}{$symbol}{d};
-          $self->{Portofolios}{$depot}{$pos}{Pos_Dividende_Percent}  = $self->{Kurs}{$symbol}{l1} ? 100 * $self->{Portofolios}{$depot}{$pos}{Pos_Dividende} / $self->{Kurs}{$symbol}{l1} : 0;
+          if ($self->{Portofolios}{$depot}{$pos}{Pos_Buy_Price}) {
+            $self->{Portofolios}{$depot}{$pos}{Pos_Change_Percent}   = 100 * $self->{Portofolios}{$depot}{$pos}{Pos_Change} / $self->{Portofolios}{$depot}{$pos}{Pos_Buy_Price};
+          } else {
+            $self->{Portofolios}{$depot}{$pos}{Pos_Change_Percent}   = 0;
+          }
+          $self->{Portofolios}{$depot}{$pos}{Pos_Div_Summe}          = $self->{Portofolios}{$depot}{$pos}{Pos_Quantity} * $self->{Kurs}{$symbol}{div};
+          $self->{Portofolios}{$depot}{$pos}{Pos_Dividende_Percent}  = $self->{Kurs}{$symbol}{last} ? 100 * $self->{Portofolios}{$depot}{$pos}{Pos_Dividende} / $self->{Kurs}{$symbol}{last} : 0;
           $self->{Portofolios}{$depot}{$pos}{Pos_Dividende_Summe}    = $self->{Portofolios}{$depot}{$pos}{Pos_Price} * $self->{Portofolios}{$depot}{$pos}{Pos_Dividende_Percent} / 100;
 
           # Aufsummieren Portofolio und Gesamt
@@ -853,7 +881,7 @@ sub analysiere_Portofolios {
     } ## end foreach my $pos (keys %{$self...})
 
     foreach my $pos (keys %{$self->{Portofolios}{$depot}}) {
-      if ($summe{$depot}{Pos_Price} && $self->{Kurs}{(split(' ', $pos))[0]}{l1}) {
+      if ($summe{$depot}{Pos_Price} && $self->{Kurs}{(split(' ', $pos))[0]}{last}) {
         # Werte formatieren
         $self->{Portofolios}{$depot}{$pos}{Pos_Anteil}            = spf('%5.2f',  100 * $self->{Portofolios}{$depot}{$pos}{Pos_Price} / $summe{$depot}{Pos_Price});
         $self->{Portofolios}{$depot}{$pos}{Pos_Buy_Price}         = spf('%9.2f',  $self->{Portofolios}{$depot}{$pos}{Pos_Buy_Price});
@@ -903,9 +931,9 @@ sub analysiere_Portofolios {
   } ## end if (defined($summe{Summe...}))
 
   foreach my $symbol (keys %{$self->{Kurs}}) {
-    foreach my $flag (keys %{$self->{Kurs}{$symbol}}) {
-      if ($self->{Flags}{$flag}{Format}) {
-        $self->{Kurs}{$symbol}{$flag} = sprintf($self->{Flags}{$flag}{Format}, $self->{Kurs}{$symbol}{$flag});
+    foreach my $flagname (keys %{$self->{Kurs}{$symbol}}) {
+      if ($self->{Flags}{$flagname}{Format}) {
+        $self->{Kurs}{$symbol}{$flagname} = sprintf($self->{Flags}{$flagname}{Format}, $self->{Kurs}{$symbol}{$flagname});
       }
     }
   }
@@ -980,7 +1008,7 @@ sub schreibe_Ausgabe {
   my %ausgabedatei = Configuration->config('Ausgabedatei');
   foreach my $depot (keys %{$self->{Portofolios}}) {
     $bg     = 'on_black';
-    $format = "Name|$depot|";
+    $format = "Portofolio|$depot|";
     foreach my $pos (keys %{$self->{Portofolios}{Summe}{$depot}}) {
       $format .= "$pos|$self->{Portofolios}{Summe}{$depot}{$pos}|";
     }
@@ -1001,6 +1029,7 @@ sub schreibe_Ausgabe {
     # Ausgabe der Header fuer TXT und CSV puffern
     foreach my $ausgabe (keys %ausgabedatei) {
       if ($self->{Portofolios}{Summe}{$depot}) {
+        # Unterscheidung Depotuebersicht oder Einzeldepot
         my $summe = ($depot eq 'Summe') ? '_S' : '_';
         if (Configuration->config('Ausgabeformat', $ausgabe . $summe . 'Head')) {
           my $line = (Configuration->config('Ausgabeformat', $ausgabe . $summe . 'Trenn')) ? Configuration->config('Ausgabeformat', $ausgabe . $summe . 'Trenn') . "\n" : "\n";
@@ -1012,19 +1041,21 @@ sub schreibe_Ausgabe {
       } ## end if ($self->{Portofolios...})
     } ## end foreach my $ausgabe (keys %ausgabedatei)
 
-    # Ausgabe der Einzeltitel
+    # Aufbau der Einzeltitel
     my %sortlist;
     if ($depot eq 'Summe') {
+      # Depotuebersicht
       foreach my $pos (keys %{$self->{Portofolios}{$depot}}) {
         if ($pos ne 'Summe' && (split(' ', $pos))[0] ne '1') {
           $sortlist{uc($pos)} = $pos;
         }
       }
     } else {
+      # Einzeldepots
       foreach my $pos (keys %{$self->{Portofolios}{$depot}}) {
         $symbol = (split(' ', $pos))[0];
-        if ($self->{Kurs}{$symbol}{n}) {
-          $sortlist{uc($self->{Kurs}{$symbol}{n} . $pos)} = $pos;
+        if ($self->{Kurs}{$symbol}{name}) {
+          $sortlist{uc($self->{Kurs}{$symbol}{name} . $pos)} = $pos;
         }
       }
     }
@@ -1034,18 +1065,18 @@ sub schreibe_Ausgabe {
       if ($pos ne 'Summe') {
         $bg = $bg eq 'on_black' ? 'on_blue' : 'on_black';
         if ($depot eq 'Summe') {
-          $format = "Name|$pos|";
+          $format = "Depotname|$pos|";
           $format .= 'CA|' . colorize($self->{Portofolios}{$depot}{$pos}{Pos_Anteil} || 0, 50, 40, 30, 20) . '|';
         } else {
           $symbol = (split(' ', $pos))[0];
-          $format = "Name|" . (split('\|', $symbol))[0] . "|";
+          $format = "Symbollangname|" . (split('\|', $symbol))[0] . "|";
           # Durchfuehren der Einzelwertformatierung und
           # Einsammeln aller allgemeinen Einzelwertattribute
           foreach my $flag (keys %{$self->{Kurs}{$symbol}}) {
-            $format .= "$flag|$self->{Kurs}{$symbol}{$flag}|";
+            if (defined($flag) && defined($symbol) && defined($self->{Kurs}{$symbol}{$flag})) {$format .= "$flag|$self->{Kurs}{$symbol}{$flag}|"};
           }
           $format .= 'CA|' . colorize($self->{Portofolios}{$depot}{$pos}{Pos_Anteil} || 0, 5, 4, 3, 2) . '|';
-          $format .= 'CD|' . colorize($self->{Kurs}{$symbol}{y} || 0, 1, 2, 3, 4) . '|';
+          $format .= 'CD|' . colorize($self->{Kurs}{$symbol}{div_yield} || 0, 1, 2, 3, 4) . '|';
           $format .= 'CL|' . colorize($self->{Kurs}{$symbol}{_lastTrade}, 3, 2, 1, 0) . '|';
         } ## end else [ if ($depot eq 'Summe')]
         # Einsammeln aller depotspezifischen Einzelwertattribute

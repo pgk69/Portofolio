@@ -12,7 +12,7 @@ eval 'exec perl -wS $0 ${1+"$@"}'
 # $URL: $
 #-------------------------------------------------------------------------------
 
-# Letzte Aenderung:
+# Letzte Aenderung: 
 
 use warnings;    # on by default
 
