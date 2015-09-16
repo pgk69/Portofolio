@@ -107,6 +107,11 @@ if ($@) {
 # PRGRAMM-Start
 #-------------------------------------------------------------------------------
 $prg->lese_Portofolios(CmdLine->argument());
+$prg->extract_Cash();
+$prg->erzeuge_Gesamtliste() if ($prg->{Gesamtliste});
+$prg->parse_Positionen();
+$prg->ergaenze_Wechselkurse();
+
 $prg->Kurse_ermitteln();
 $prg->analysiere_Portofolios();
 $prg->schreibe_Ausgabe();
