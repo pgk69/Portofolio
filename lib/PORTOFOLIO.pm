@@ -64,7 +64,7 @@ use LWP::Simple;
 use Date::Parse;
 use Date::Format;
 use POSIX();
-use Term::ANSIColor;
+use Term::ANSIColor qw(color RESET :constants :constants256);
 use File::Copy;
 use File::Path;
 use File::Basename;
@@ -248,13 +248,16 @@ sub _init {
   $self->{UTCDelta} = Configuration->config('Stockservice', 'UTCDelte') || +0100;
 
   # Farben
-  $self->{BG}->{normal}  = ' ' . (Configuration->config('Color', 'normal')  || 'on_black');
-  $self->{BG}->{invers}  = ' ' . (Configuration->config('Color', 'invers')  || 'on_blue');
-  $self->{FG}->{neutral} =        Configuration->config('Color', 'neutral') || 'clear ';
-  $self->{FG}->{pp}      =        Configuration->config('Color', 'pp')      || 'green ';
-  $self->{FG}->{p}       =        Configuration->config('Color', 'p')       || 'cyan ';
-  $self->{FG}->{m}       =        Configuration->config('Color', 'm')       || 'magenta ';
-  $self->{FG}->{mm}      =        Configuration->config('Color', 'mm')      || 'red ';
+  $Term::ANSIColor::AUTORESET = 1;
+  $self->{Color}->{normal}  = ' ' . (Configuration->config('Color', 'normal')  || 'on_ansi0');
+  $self->{Color}->{invers}  = ' ' . (Configuration->config('Color', 'invers')  || 'on_grey5');
+  $self->{Color}->{clear}   =        Configuration->config('Color', 'clear')   || 'clear';
+  $self->{Color}->{neutral} =       (Configuration->config('Color', 'neutral') || 'white') . ' ';
+  $self->{Color}->{pp}      =       (Configuration->config('Color', 'pp')      || 'green') . ' ';
+  $self->{Color}->{p}       =       (Configuration->config('Color', 'p')       || 'cyan') . ' ';
+  $self->{Color}->{m}       =       (Configuration->config('Color', 'm')       || 'rgb525') . ' ';
+  $self->{Color}->{mm}      =       (Configuration->config('Color', 'mm')      || 'rgb501') . ' ';
+  $self->{Color}->{reset}   =        Configuration->config('Color', 'reset')   || ($self->{Color}->{neutral} . $self->{Color}->{normal});
 
 } ## end sub _init
 
@@ -1068,6 +1071,8 @@ sub analysiere_Portofolios {
   foreach (keys %{$self->{Portofolios}{Summe}}) {
     if ($_ =~ /Portofolio .*/) {
       $self->{Portofolios}{Summe}{$_}{Portion} = $self->{Portofolios}{Summe}{"Watchlist $self->{Gesamtliste}"}{Price} ? 100 * $self->{Portofolios}{Summe}{$_}{Price} / $self->{Portofolios}{Summe}{"Watchlist $self->{Gesamtliste}"}{Price} : 0;
+    } else {
+      $self->{Portofolios}{Summe}{$_}{Portion} = '';
     }
   }
   foreach my $depot (keys %{$self->{Portofolios}}) {
@@ -1113,16 +1118,18 @@ sub _createFormat {
 
   my $self = shift;
   
-  my %args = ('Ausgabe'  => '', 
-              'Part'     => '', 
-              'Depot'    => '', 
-              'Position' => '',
+  my %args = ('Ausgabe'    => '', 
+              'Part'       => '', 
+              'Depot'      => '', 
+              'Position'   => '',
+              'Background' => $self->{bg}->{normal},
               @_);
                 
   my $ausgabe = $args{'Ausgabe'};
   my $part    = $args{'Part'};
   my $depot   = $args{'Depot'};
   my $pos     = $args{'Position'};
+  my $bg      = $args{'Background'};
   
   $pos = 'Watchlist Summe' if ($pos eq 'Summe');
   my $symbol = (split(' ', $pos))[0];
@@ -1151,17 +1158,25 @@ sub _createFormat {
   }
 
   # Konsolensteuerung (Farbe):
+  # Shortcuts
+  $formatHash{C} = color($self->{Color}->{'clear'});
+  $formatHash{R} = color($self->{Color}->{'reset'});
+  $formatHash{N} = color($self->{Color}->{'neutral'});
+  $formatHash{I} = color($self->{Color}->{'invers'});
+  $formatHash{B} = color($bg) if $bg;
+
+  # Langversion
+  foreach (keys(%{$self->{Color}})) {$formatHash{$_} = color($self->{Color}->{$_})}
+  
   # W : Aenderung seit Kauf
   # D : Tagesaenderung
   # P : Portion am Gesamtvermoegen
   # Y : Dividende
   # L : Letzter Kurs veraltet
   foreach (keys %{$self->{Portofolios}{$depot}{$pos}{Rating}}) {
-    my $col = color($self->{FG}->{$self->{Portofolios}{$depot}{$pos}{Rating}{$_}});
+    my $col = color($self->{Color}->{$self->{Portofolios}{$depot}{$pos}{Rating}{$_}});
     $formatHash{substr($_, 0, 1)} = $col if (defined($col));
   }
-  # C : Ruecksetzen der Farbe
-  $formatHash{C} = color($self->{FG}->{'neutral'});
   
   # Ersetzen der '|' durch '/'
   foreach (keys(%formatHash)) {
@@ -1206,11 +1221,14 @@ sub _push {
       }
     }
 
+    my $bg = $self->{Color}->{normal};
     foreach (sort keys %sortlist) {
-      my $format = $self->_createFormat('Ausgabe',  $ausgabe,
-                                        'Part',     'Data',
-                                        'Depot',    $depot,
-                                        'Position', $sortlist{$_});  
+      my $format = $self->_createFormat('Ausgabe',    $ausgabe,
+                                        'Part',       'Data',
+                                        'Depot',      $depot,
+                                        'Position',   $sortlist{$_},
+                                        'Background', $bg);  
+      $bg = $bg eq $self->{Color}->{normal} ? $self->{Color}->{invers} : $self->{Color}->{normal};
       Trace->Trc('I', 10, "Format: <$format> wird angewendet auf Ausgabe: <" . Configuration->config("Ausgabeformat_$ausgabe", 'Data') . ">.");
       my $ausgabestring = Utils::extendString(Configuration->config("Ausgabeformat_$ausgabe", 'Data'), $format);
       Trace->Trc('I', 10, "Schreibe Data: <$ausgabe>  Depot: <$depot>: <$ausgabestring>");
@@ -1225,7 +1243,7 @@ sub _push {
     Trace->Trc('I', 5, "Schreibe Head: <$ausgabe>  Depot: <$depot>: <$ausgabestring>");
     push(@{$self->{Ausgabe}{$ausgabe}{$depot}}, $ausgabestring);
   } else {
-    push(@{$self->{Ausgabe}{$ausgabe}{$depot}}, Utils::extendString(Configuration->config("Ausgabeformat_$ausgabe", $part), "C|" . color($self->{FG}->{'neutral'})));
+    push(@{$self->{Ausgabe}{$ausgabe}{$depot}}, Utils::extendString(Configuration->config("Ausgabeformat_$ausgabe", $part), "R|" . color($self->{Color}->{'reset'})));
   }
   
   return;
