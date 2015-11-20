@@ -69,8 +69,10 @@ use File::Copy;
 use File::Path;
 use File::Basename;
 use FindBin qw($Bin $Script $RealBin $RealScript);
+use Cpanel::JSON::XS qw(encode_json decode_json);
 use Storable;
 use Finance::Quote;
+use Locale::Currency;
 
 #
 # Konstantendefinition
@@ -134,7 +136,6 @@ sub _init {
   Trace->Trc('S', 1, 0x00001, Configuration->prg, $VERSION . " (" . $$ . ")" . " Test: " . Trace->test() . " Parameter: " . CmdLine->new()->{ArgStrgRAW});
 
   if (Configuration->config('Prg', 'Plugin')) {
-
     # refs ausschalten wg. dyn. Proceduren
     no strict 'refs';
     my %plugin = ();
@@ -158,17 +159,16 @@ sub _init {
     } ## end foreach (split(' ', Configuration...))
     use strict;
   } ## end if (Configuration->config...)
-
   # Module::Refresh->refresh;
 
   # Test der benoetigten INI-Variablen
   # DB-Zugriff
 
   # Web-Abfrage
-  if (Configuration->config('Stockservice', 'Source') eq 'YAHOO') {
-    Trace->Exit(1, 0, 0x0f009, 'Stockservice', 'URL') if (!defined(Configuration->config('Stockservice', 'URL')));
-    Trace->Exit(1, 0, 0x0f009, 'Stockinfos') if (!defined(Configuration->config('Stockinfos')));
+  if (defined(Configuration->config('Stockservice Yahoo'))) {
+    Trace->Exit(1, 0, 0x0f009, 'Stockservice Yahoo', 'URL') if (!defined(Configuration->config('Stockservice Yahoo', 'URL')));
   }
+  Trace->Exit(1, 0, 0x0f009, 'Stockservice') if (!defined(Configuration->config('Stockservice')));
 
   # Ergebnisausgabe und Sicherung
   if (Configuration->config('Prg', 'LockFile')) {
@@ -200,6 +200,9 @@ sub _init {
     $self->{VarFile} = Utils::extendString(Configuration->config('Prg', 'VarFile'), "BIN|$Bin|SCRIPT|" . uc($Script));
   }
 
+  # BasisWaehrung festlegen
+  $self->{BasisCur} = Configuration->config('Prg', 'BasisCurrency') || 'EUR';
+
   # Positionen aufsummieren
   $self->{SumPos} = Configuration->config('Prg', 'PosAufsummieren') ? 1 : 0;
 
@@ -220,14 +223,15 @@ sub _init {
     $self->{TZ} = 'EDT';
   }
 
-  # Aufbau der Abfrage-URL
-  my %stockInfos = Configuration->config('Stockinfos');
+  # Aufbau der Info Flags
+  my %stockInfos = Configuration->config('Stockservice');
   my %flags;
 
   foreach (keys %stockInfos) {
+  	next if ($_ !~ /^Info (.*)$/);
     my ($name, $info, $faktor, $laenge, $default, @format) = split(' ', $stockInfos{$_});
-    if (!defined($default) || ($default eq '-')) {$default = ''}
-    $flags{$_} = {Abbr    => $name,
+    if (defined($name) && (!defined($default) || ($default eq '-'))) {$default = ''}
+    $flags{$1} = {Abbr    => $name,
                   Flag    => $info,
                   Faktor  => $faktor || 0,
                   Laenge  => $laenge,
@@ -245,7 +249,7 @@ sub _init {
   $self->{MaxDelay} = Configuration->config('Stockservice', 'MaxDelay') || 86400;
 
   # Differenz uzu UTC
-  $self->{UTCDelta} = Configuration->config('Stockservice', 'UTCDelte') || +0100;
+  $self->{UTCDelta} = Configuration->config('Stockservice', 'UTCDelta') || +0100;
 
   # Farben
   $Term::ANSIColor::AUTORESET = 1;
@@ -298,116 +302,127 @@ sub _webabruf_YAHOO {
   #
   # Prozedurnummer 1
   #
+
   my $self = shift;
 
   my $merker = $self->{subroutine};
   $self->{subroutine} = (caller(0))[3];
   Trace->Trc('S', 3, 0x00001, $self->{subroutine}, $self->{Eingabedatei});
 
-  my $symbol  = shift;
-  my $hashptr = shift;
-  my $flagptr = shift;
-
   no autovivification;
 
-  my $rc = 0;
+  my $rc = 0; 
 
-  if (!$$hashptr{_aktuell} && (!$$hashptr{_letzter_Abruf} || ($$hashptr{_letzter_Abruf} < time - $self->{MaxDelay}))) {
-    push(@$flagptr, ('last', 'date', 'time'));
-    my %unique = ();
-    $unique{$_} = 0 for @$flagptr;
-    my @flags = sort(keys %unique);
+  my %hashTemp = map {$_ => 1} (keys %{$self->{Flags}}, ('last', 'date', 'time'));
+  my @flags = sort(keys %hashTemp);
+  Trace->Trc('I', 2, 0x02101, join(' ', @flags));
+  
+  foreach (sort keys %{$self->{Kurs}}) {
+    my @symbols = split('\|', $_);
+    my $hashptr = $self->{Kurs}{$_};
+    while ((my $symbol = shift(@symbols)) && !($$hashptr{last})) {
+      # Fuer jedes Symbol den Abruf machen sofern noch kein Kurs feststeht
+      Trace->Trc('I', 2, 0x02104, $symbol);
+      if (!$$hashptr{_aktuell} && (!$$hashptr{_letzter_Abruf} || ($$hashptr{_letzter_Abruf} < time - $self->{MaxDelay}))) {
+        my $webAbruf = Utils::extendString(Configuration->config('Stockservice Yahoo', 'URL'), 'STOCK|' . $symbol . '|DATA|' . join('', @flags));
+        my $maxtry = Configuration->config('Stockservice Yahoo', 'Anzahl_Versuche') || 10;
 
-    Trace->Trc('I', 2, 0x02101, $symbol, join('', @flags));
+        my $crlfmerker = $/;
+        $/ = '%';
 
-    my (@myFlags, $flag, $flagname, $stockdata, $wert);
+        $$hashptr{_aktuell} = 0;
+        do {
+          my $stockdata = get($webAbruf);
+          if (defined($stockdata) && $stockdata !~ 'Missing') {
+            # die "Failed to get Stock Data" unless defined $stockdata;
+            my @myFlags   = @flags;
+            while ($stockdata =~ /\"[\s0]*([^\"]+?)[\s]*\"|[\s0]*([^,\s]+)/g) {
+              chomp(my $wert = $1 ? $1 : $2);
+              $wert        = 0 if ($wert eq 'N/A');
+              my $flagname = shift(@myFlags);
+              my $flag     = $self->{Flags}{$flagname}{Abbr};
+              if (defined($flag) && $flag ne '-') {
+                # Sichern des Originalwertes
+                if ($self->{Flags}{$flagname}{Faktor}) {
+                  $$hashptr{$flagname . '_RAW'} = $wert
+                }
+                if ($self->{Flags}{$flagname}{Faktor} && $$hashptr{_Waehrung}) {
+                  if ($self->{Flags}{$flagname}{Faktor} == 1) {
+                    my $curxchg = 'EUR' . $$hashptr{_Waehrung} . '=X';
+                    # Falls der Wechselkurs fuer die Waehrung noch nicht ermittelt ist,
+                    # versuchen wir das
+                    if (!$self->{Kurs}{$curxchg}{last}) {
+                      # Default -> Wechselkurs 1
+                      $self->{Kurs}{$curxchg}{last} = 1;
+                      if ($$hashptr{_Waehrung} ne 'EUR') {
+                        if ($$hashptr{_Waehrung} =~ /^[0-9.,]+/) {
+                          # Keine Standardwaehrung -> Wechselkurs wird direkt angegeben
+                          $self->{Kurs}{$curxchg}{last} = $$hashptr{_Waehrung};
+                        } elsif ($$hashptr{_Waehrung} =~ /^[A-Za-z][A-Za-z0-9]{2}/) {
+                          # Standardwaehrung -> Wechselkurs wird ermittelt
+                          $self->_webabruf_YAHOO($curxchg, $self->{Kurs}{$curxchg});
+                          # Normalisieren des Wertes
+                          $self->{Kurs}{$curxchg}{last} *= 1;
+                          # Fuer GBP ist ein weiterer Faktor 100 noetig
+                          $self->{Kurs}{$curxchg}{last} *= 100 if ($$hashptr{_Waehrung} eq 'GBP');
+                        }
+                      } ## end if ($$hashptr{_Waehrung...})
+                    } ## end if (!$self->{Kurs}{$curxchg...})
+                    $self->{Exchange}{$$hashptr{_Waehrung}} = $self->{Kurs}{$curxchg}{last};
 
-    my $webAbruf = Utils::extendString(Configuration->config('Stockservice', 'URL'), 'STOCK|' . $symbol . '|DATA|' . join('', @flags));
-    my $maxtry = Configuration->config('Stockservice', 'Anzahl_Versuche') || 10;
+                    # Der Wert in EUR wird nur ermittelt, falls ein Wechselkurs existiert
+                    $wert = $wert / $self->{Kurs}{$curxchg}{last} if ($self->{Kurs}{$curxchg}{last});
+                  } else {
+                    $wert = $wert * $self->{Flags}{$flag}{Faktor};
+                  }
+                } ## end if ($self->{Flags}{$flag...})
+                # Sichern des faktorisierten Wertes
+                $$hashptr{$flagname} = ($flagname ne 'symbol') ? $wert : (split(/\./, $wert))[0];
+              } ## end if (defined($flag))
+            } ## end while ($stockdata =~ /\"[\s0]*([^\"]+?)[\s]*\"|[\s0]*([^,\s]+)/g)
+          } ## end if (defined($stockdata...))
+          $maxtry--;
+        }
+        until ($maxtry <= 0 || ($$hashptr{last} &&
+                                $$hashptr{last} ne 'N/A' &&
+                                $$hashptr{last} > 0 &&
+                                $$hashptr{last} <= 1000000 &&
+                                $$hashptr{last} != 1));
 
-    my $crlfmerker = $/;
-    $/ = '%';
+        if ($$hashptr{date} && $$hashptr{'time'}) {
+          my $tradetime = str2time("$$hashptr{date} $$hashptr{'time'}", $self->{TZ}) || 0;
+          $$hashptr{_Tradetime} = time2str('%d.%m.%y %R', $tradetime);
+          $$hashptr{_lastTrade} = abs((str2time(time2str('%x', time)) - str2time(time2str('%x', $tradetime))) / 86400);
+          if ($tradetime < str2time(time2str('%x', time))) {
+            # $$hashptr{_Tradetime} .= '<';
+            $$hashptr{_aktuell} = ($$hashptr{_letzter_Abruf} && $$hashptr{_letzter_Abruf} < time - $self->{MaxDelay}) ? 0 : 1;
+          } else {
+            $$hashptr{_aktuell} = 1
+          }
+          $$hashptr{_letzter_Abruf} = time;
+        } else {
+          $$hashptr{_Tradetime} = 0
+        }
 
-    $$hashptr{_aktuell} = 0;
-    do {
-      @myFlags   = @flags;
-      $stockdata = get($webAbruf);
-      if (defined($stockdata) && $stockdata !~ 'Missing') {
+        if ($$hashptr{name}) {
+          $$hashptr{name} =~ s/\s+N$//
+        }
 
-        # die "Failed to get Stock Data" unless defined $stockdata;
-        while ($stockdata =~ /\"[\s0]*([^\"]+?)[\s]*\"|[\s0]*([^,\s]+)/g) {
-          chomp($wert = $1 ? $1 : $2);
-          $wert = 0 if ($wert eq 'N/A');
-#          $flag = shift(@myFlags);
-          $flagname = shift(@myFlags);
-          $flag     = $self->{Flags}{$flagname}{Abbr};
-          if (defined($flag) && $flag ne '-') {
-            # Sichern des Originalwertes
-            if ($self->{Flags}{$flagname}{Faktor}) {$$hashptr{$flagname . '_RAW'} = $wert}
-            if ($self->{Flags}{$flagname}{Faktor} && $$hashptr{_Waehrung}) {
-              if ($self->{Flags}{$flagname}{Faktor} == 1) {
-                my $curxchg = 'EUR' . $$hashptr{_Waehrung} . '=X';
-                # Falls der Wechselkurs fuer die Waehrung noch nicht ermittelt ist,
-                # versuchen wir das
-                if (!$self->{Kurs}{$curxchg}{last}) {
-                  # Default -> Wechselkurs 1
-                  $self->{Kurs}{$curxchg}{last} = 1;
-                  if ($$hashptr{_Waehrung} ne 'EUR') {
-                    if ($$hashptr{_Waehrung} =~ /^[0-9.,]+/) {
-                      # Keine Standardwaehrung -> Wechselkurs wird direkt angegeben
-                      $self->{Kurs}{$curxchg}{last} = $$hashptr{_Waehrung};
-                    } elsif ($$hashptr{_Waehrung} =~ /^[A-Za-z][A-Za-z0-9]{2}/) {
-                      # Standardwaehrung -> Wechselkurs wird ermittelt
-                      $self->_webabruf_YAHOO($curxchg, $self->{Kurs}{$curxchg});
-                      # Normalisieren des Wertes
-                      $self->{Kurs}{$curxchg}{last} *= 1;
-                      # Fuer GBP ist ein weiterer Faktor 100 noetig
-                      $self->{Kurs}{$curxchg}{last} *= 100 if ($$hashptr{_Waehrung} eq 'GBP');
-                    }
-                  } ## end if ($$hashptr{_Waehrung...})
-                } ## end if (!$self->{Kurs}{$curxchg...})
+        Trace->Trc('I', 2, 0x02102, $symbol, $$hashptr{name}, $$hashptr{last});
 
-                # Der Wert in EUR wird nur ermittelt, falls ein Wechselkurs existiert
-                $wert = $wert / $self->{Kurs}{$curxchg}{last} if ($self->{Kurs}{$curxchg}{last});
-              } else {
-                $wert = $wert * $self->{Flags}{$flag}{Faktor};
-              }
-            } ## end if ($self->{Flags}{$flag...})
-            # Sichern des faktorisierten Wertes
-            $$hashptr{$flagname} = ($flagname ne 'symbol') ? $wert : (split(/\./, $wert))[0];
-          } ## end if (defined($flag))
-        } ## end while ($stockdata =~ /\"[\s0]*([^\"]+?)[\s]*\"|[\s0]*([^,\s]+)/g)
-      } ## end if (defined($stockdata...))
-      $maxtry--;
+        $/ = $crlfmerker;
+      } ## end if (!$$hashptr{_aktuell...})
+
+      if ($$hashptr{_last}) {
+        $$hashptr{last} = $$hashptr{_last}
+      }
+
+      # Kursinfos speichern
+      if (exists($self->{VarFile})) {
+        store $self->{Kurs}, $self->{VarFile}
+      }
     }
-    until ($maxtry <= 0 || ($$hashptr{last} &&
-                            $$hashptr{last} ne 'N/A' &&
-                            $$hashptr{last} > 0 &&
-                            $$hashptr{last} <= 1000000 &&
-                            $$hashptr{last} != 1));
-
-    if ($$hashptr{date} && $$hashptr{'time'}) {
-      my $tradetime = str2time("$$hashptr{date} $$hashptr{'time'}", $self->{TZ}) || 0;
-      $$hashptr{_Tradetime} = time2str('%d.%m.%y %R', $tradetime);
-      $$hashptr{_lastTrade} = abs((str2time(time2str('%x', time)) - str2time(time2str('%x', $tradetime))) / 86400);
-
-      if ($tradetime < str2time(time2str('%x', time))) {
-
-        # $$hashptr{_Tradetime} .= '<';
-        $$hashptr{_aktuell} = ($$hashptr{_letzter_Abruf} && $$hashptr{_letzter_Abruf} < time - $self->{MaxDelay}) ? 0 : 1;
-      } else {$$hashptr{_aktuell} = 1}
-      $$hashptr{_letzter_Abruf} = time;
-    } else {$$hashptr{_Tradetime} = 0}
-
-    if ($$hashptr{name}) {$$hashptr{name} =~ s/\s+N$//}
-
-    Trace->Trc('I', 2, 0x02102, $symbol, $$hashptr{name}, $$hashptr{last});
-
-    $/ = $crlfmerker;
-  } ## end if (!$$hashptr{_aktuell...})
-
-  # Kursinfos speichern
-  if (exists($self->{VarFile})) {store $self->{Kurs}, $self->{VarFile}}
+  }
 
   Trace->Trc('S', 3, 0x00002, $self->{subroutine});
   $self->{subroutine} = $merker;
@@ -432,38 +447,55 @@ sub _webabruf_QUOTE {
   no autovivification;
   
   # Array ueber alle Symbole erstellen
-  my @markets = split(' ', Configuration->config('Stockservice', 'Markets'));
+  my @markets = split(' ', Configuration->config('Stockservice Finance::Quote', 'Markets'));
   if (!@markets) {@markets = (qw/vwd europe/)};
 
   my %symbolhash;
   # Waehrungen aus %kurs extrahieren
   foreach (keys %{$self->{Kurs}}) {
-    foreach my $symbol (split('\|', $_)) {$symbolhash{$symbol} = $_}
+    foreach my $symbol (split('\|', $_)) {
+      $symbolhash{$symbol} = $_
+    }
   }
 
   my $quoter = Finance::Quote->new();
   $quoter->set_currency(EUR);  # Set default currency.
     
   foreach my $quelle (@markets) {
+    Trace->Trc('I', 2, 0x02105, $quelle);
     my @symbols;
-    foreach (sort keys %symbolhash) {push(@symbols, $_) if (!$self->{Kurs}{$symbolhash{$_}}{_aktuell})}
+    foreach (sort keys %symbolhash) {
+      if (!$self->{Kurs}{$symbolhash{$_}}{_aktuell} && 
+         (!$self->{Kurs}{$symbolhash{$_}}{_letzter_Abruf} || ($self->{Kurs}{$symbolhash{$_}}{_letzter_Abruf} < time - $self->{MaxDelay}))) {
+        push(@symbols, $_)
+      }
+    }
     if (scalar(@symbols)) {
-      Trace->Trc('I', 2, 0x02101, $quelle, join(' ', @symbols));
+      Trace->Trc('I', 2, 0x02104, join(' ', @symbols));
       my %info = $quoter->fetch($quelle, @symbols);
 
       # Ergebnisse auswerten und @symbol aktualisieren
       foreach my $symbol (@symbols) {
-        next unless $info{$symbol,"success"}; # Skip failures.
-        next unless $info{$symbol,"last"} ne '0,00'; # Skip failures.
+        next if !$info{$symbol,"success"};       # Skip failures.
+        next if $info{$symbol,"last"} eq '0,00'; # Skip failures.
         my $hashptr = $self->{Kurs}{$symbolhash{$symbol}};
         my %value;
-        foreach (keys %{$self->{Flags}}) {
-          Trace->Trc('I', 2, 0x02102, $symbol, $_, $info{$symbol, $_});
-          if (defined($info{$symbol, $_})) {
-            if (defined($self->{Flags}{$_}{Laenge})) {$value{$_} = substr($info{$symbol, $_}, 0, $self->{Flags}{$_}{Laenge})}}  
-          else {
-            if (defined($self->{Flags}{$_}{Default})) {$value{$_} = $self->{Flags}{$_}{Default}}
+        foreach my $flag (keys %{$self->{Flags}}) {
+          Trace->Trc('I', 5, 0x02102, $symbol, $flag, $info{$symbol, $flag});
+          if (defined($info{$symbol, $flag})) {
+            if (defined($self->{Flags}{$flag}{Laenge}) && ($self->{Flags}{$flag}{Laenge} ne '-')) {
+              $value{$flag} = substr($info{$symbol, $flag}, 0, $self->{Flags}{$flag}{Laenge})
+            } else {
+              $value{$flag} = $info{$symbol, $flag}
+            }
+          } else {
+            if (defined($self->{Flags}{$flag}{Default})) {$value{$flag} = $self->{Flags}{$flag}{Default}}
           }
+        }
+        if ($value{symbol} =~ /=X$/) {
+          my ($currency_to, $currency_from) = split('/', $value{name});
+          $value{last} = $quoter->currency($currency_from, $currency_to);
+          $self->{Exchange}{$currency_from} = $value{last};
         }
       
         my $tradetime = 0;
@@ -474,8 +506,12 @@ sub _webabruf_QUOTE {
       
           foreach my $flagname (keys(%value)) {
             if ($self->{Flags}{$flagname}{Faktor}) {$$hashptr{$flagname . '_RAW'} = $value{$flagname}}
-            $$hashptr{$flagname} = ($flagname ne 'symbol') ? $value{$flagname} : (split(/\./, $value{$flagname}))[0];
-          } ## end if (defined($flag))
+            if ($flagname ne 'symbol') {
+              $$hashptr{$flagname} = $value{$flagname};
+            } else {
+              $$hashptr{$flagname} = (split(/\./, $value{$flagname}))[0];
+            }
+          }
       
           if ($tradetime) {
             $$hashptr{_tradetime} = $tradetime;
@@ -501,7 +537,9 @@ sub _webabruf_QUOTE {
   }
 
   # Kursinfos speichern
-  if (exists($self->{VarFile})) {store $self->{Kurs}, $self->{VarFile}}
+  if (exists($self->{VarFile})) {
+    store $self->{Kurs}, $self->{VarFile}
+  }
 
   Trace->Trc('S', 3, 0x00002, $self->{subroutine});
   $self->{subroutine} = $merker;
@@ -627,22 +665,39 @@ sub extract_Cash {
   foreach my $PFName (keys(%tmpHash)) {
     foreach my $pos (keys %{$tmpHash{$PFName}}) {
       if ($pos !~ /^CASH/) {
-        Trace->Trc('I', 2, "Bearbeite aus Portofolio <%s> Share-Position <%s>.", $PFName, $pos);
+        Trace->Trc('I', 5, "Bearbeite aus Portofolio <%s> Share-Position <%s>.", $PFName, $pos);
         $PFHash{$PFName}{$pos} = $tmpHash{$PFName}{$pos};
       } else {
         if ($PFName =~ /^Portofolio .*$/ && $pos =~ /^CASH\.(.*)\.(.*)$/) {
           my ($owner, $bank) = ($1, $2);
           if (defined($owner) && defined($bank)) {
-            my ($cur, $value) = split(/\|/, $tmpHash{$PFName}{$pos});
-            if (!defined($value)) {
-              $value = $cur;
-              $cur   = 'EUR';
-            }
             Trace->Trc('I', 2, 0x02212, $PFName, $pos, $owner, $bank);
-            $cash{$owner}{$bank}{$cur} += $value;
-            $cash{$owner}{Summe}{$cur} += $value;
-            $cash{Bank}{$bank}{$cur}   += $value;
-            $cash{Bank}{Summe}{$cur}   += $value;
+            my @valuearr = ref($tmpHash{$PFName}{$pos}) ? @{$tmpHash{$PFName}{$pos}} : ($tmpHash{$PFName}{$pos});
+            foreach (@valuearr) {
+              Trace->Trc('I', 5, "Parse line <$_>");
+              my ($cur, $value);
+              if ($_ =~ /^\{.*\}$/) {
+                # JSON Syntax
+                my $attrHash = decode_json $_;
+                $cur   = $attrHash->{Currency} || 'EUR';
+                $value = $attrHash->{Cash}     || 0;
+              } else {
+                # Old Syntax EUR|12345.00 alternativ nur 12345.00
+                ($cur, $value) = split(/\|/, $_);
+                if (!defined($value)) {
+                  $value = $cur;
+                  $cur   = 'EUR';
+                }
+              }
+              if (defined(code2currency($cur))) {
+                $cash{$owner}{$bank}{$cur} += $value;
+                $cash{$owner}{Summe}{$cur} += $value;
+                $cash{Bank}{$bank}{$cur}   += $value;
+                $cash{Bank}{Summe}{$cur}   += $value;
+              } else {
+                Trace->Trc('I', 2, 0x02213, $cur);
+              }
+            }
           }
         }
       }
@@ -680,7 +735,7 @@ sub erzeuge_Gesamtliste {
   foreach my $PFName (%PFHash) {
     if ($PFName =~ /^Portofolio .*$/) {
       foreach my $pos (keys %{$PFHash{$PFName}}) {
-        Trace->Trc('I', 2, 0x02203, $PFName, $pos);
+        Trace->Trc('I', 5, 0x02203, $PFName, $pos);
         if (defined($gesamtliste{$pos})) {
           # Die spezielle Position ist schon definiert -> anhaengen -> POSITION WIRD ZU EINEM ARRAY, FALLS SIE NOCH KEINER IST
           my @dummy;
@@ -741,50 +796,103 @@ sub parse_Positionen {
     # Fuer jedes gefundene Protofolio/jede Watchlist, der/die Elemente (Aktienpositionen) enthaelt
     if (scalar keys %{$PFHash{$PFName}}) {
       foreach my $pos (keys %{$PFHash{$PFName}}) {
-        Trace->Trc('I', 4, 0x02204, $PFName, $pos, $PFHash{$PFName}{$pos});
-        my @stockattributearray;
-        if (ref($PFHash{$PFName}{$pos})) {
-          # Falls die Position mehrfach vorkommt sammel alle Vorkommen in einem Array
-          @stockattributearray = @{$PFHash{$PFName}{$pos}};
-        } else {
-          # Falls die Position nur einmal vorkommt schieb das Element in den Array
-          push(@stockattributearray, $PFHash{$PFName}{$pos});
-        }
+        # Fuer jedes Aktienpositionen
+        # Falls die Position mehrfach vorkommt sammel alle Vorkommen in einem Array
+        # Falls die Position nur einmal vorkommt schieb das Element in den Array
+        my @stockattributearray = ref($PFHash{$PFName}{$pos}) ? @{$PFHash{$PFName}{$pos}} : $PFHash{$PFName}{$pos};
+        # Im Array @stockattributearray liegen ein oder mehrere Elemente
         if ($self->{SumPos} && $#stockattributearray) {
           # Falls gewuenscht, Aufsummieren aller Einzelpositionen so, dass am Ende nur noch eine Arrayelement mit allen aufsummierten Positionen uebrig bleibt
-          my ($Currency, $Price_Buy, $Quantity, $Dividende, $Branche, $Kurs) = ('', 0, 0, 0, '', 0);
+          my $attrHash;
           while ($#stockattributearray >= 0) {
-            my @stockattribute = split('\|', shift(@stockattributearray));
-            Trace->Trc('I', 3, 0x02205, $PFName, $pos, $stockattribute[0] || '', $stockattribute[1] || '', $stockattribute[2] || '', $stockattribute[3] || '', $stockattribute[4] || '');
-            $Currency   = $stockattribute[0] || $Currency  || 'EUR';
-            $Quantity  += $stockattribute[1] || 0;
-            $Price_Buy += $stockattribute[2] || 0;
-            $Dividende  = $stockattribute[3] || $Dividende || 0;
-            $Branche    = $stockattribute[4] || $Branche   || '';
-            $Kurs       = $stockattribute[5] || $Kurs      || 0;
+            my $exg_anz_prz = shift(@stockattributearray);
+            Trace->Trc('I', 5, "Parse line <$exg_anz_prz>");
+            my @attrArr = split('\|', $exg_anz_prz);
+            if (scalar @attrArr > 1) {
+              # Alte Notation: CAD|740|10433.2|0.147|Rohstoff||
+              $attrHash->{Currency}           = $attrArr[0] || 'EUR';
+              if (!defined(code2currency($attrHash->{Currency}))) {
+                Trace->Trc('I', 2, 0x02213, $attrHash->{Currency});
+                next;
+              }
+              $attrHash->{Dividende_Currency} = $attrHash->{Currency};
+              $attrHash->{Price_Buy}         += $attrArr[2] || 0;    # ToDo: Umrechnen
+              $attrHash->{Dividende_Share}    = $attrArr[3] || '0';  # ToDo: Umrechnen
+              $attrHash->{Quantity}          += $attrArr[1] || 0;
+              $attrHash->{Branche}            = $attrArr[4] || '';
+            } else {
+              # Neue JSON Notation: {Currency:"CAD", Quantity:740, Price_Buy:10433.2, Dividende_Share:0.147, Branche:"Rohstoff", WKN:1234567,  Name:"Willi was here"}
+              my $helper = decode_json $exg_anz_prz;
+              $attrHash->{Currency}           = $helper->{Currency} || 'EUR';
+              if (!defined(code2currency($attrHash->{Currency}))) {
+                Trace->Trc('I', 2, 0x02213, $attrHash->{Currency});
+                next;
+              }
+              $attrHash->{Dividende_Currency} = $helper->{Dividende_Currency} || $helper->{Currency};
+              if (!defined(code2currency($attrHash->{Dividende_Currency}))) {
+                Trace->Trc('I', 2, 0x02213, $attrHash->{Dividende_Currency});
+                next;
+              }
+              $attrHash->{Quantity}          += $helper->{Quantity} || 0;
+              $attrHash->{Price_Buy}         += $helper->{Price_Buy} || 0;  # ToDo: Umrechnen
+              $attrHash->{Dividende_Share}    = $helper->{Dividende_Share} || '0';  # ToDo: Umrechnen
+              $attrHash->{Branche}            = $helper->{Branche} || '';
+            }
           }
-          $stockattributearray[0] = join('|', ($Currency, $Quantity, $Price_Buy, $Dividende, $Branche, $Kurs));
-          Trace->Trc('I', 2, 0x02206, $PFName, $pos, $Quantity);
+          $stockattributearray[0] = join('|', ($attrHash->{Currency}, $attrHash->{Quantity}, $attrHash->{Price_Buy}, $attrHash->{Dividende_Share}, $attrHash->{Branche}, ''));
+          Trace->Trc('I', 5, 0x02206, $PFName, $pos, $attrHash->{Quantity});
         } ## end if ($self->{SumPos} &&...)
         my $poscount = 0;
         foreach my $exg_anz_prz (@stockattributearray) {
-          my @stockattribute = split('\|', $exg_anz_prz);
           $poscount++;
           my $ppos = "$pos $poscount";
-          $self->{Kurs}{$pos}{_Waehrung}                        = $stockattribute[0] || 'EUR';
-          $self->{Kurs}{$pos}{_last}                            = 0;
-          $self->{Portofolios}{$PFName}{$ppos}{Quantity}        = $stockattribute[1];
-          $self->{Portofolios}{$PFName}{$ppos}{Price_Buy}       = $stockattribute[2];
-          $self->{Portofolios}{$PFName}{$ppos}{Dividende_Share} = $stockattribute[3] || 0;
-          $self->{Portofolios}{$PFName}{$ppos}{Branche}         = $stockattribute[4] || '';
-          $self->{Kurs}{$pos}{_last}                            = $stockattribute[5] if (defined($stockattribute[5]) && $stockattribute[5] =~ m/^([-+]?)([0-9]*).*$/);
+          my $attrHash;
+          my @attrArr = split('\|', $exg_anz_prz);
+          Trace->Trc('I', 5, "Parse line <$exg_anz_prz>");
+          if (scalar @attrArr > 1) {
+            # Alte Notation: CAD|740|10433.2|0.147|Rohstoff||
+            $attrHash->{Currency}           = $attrArr[0] || 'EUR';
+            if (!defined(code2currency($attrHash->{Currency}))) {
+              Trace->Trc('I', 2, 0x02213, $attrHash->{Currency});
+              next;
+            }
+            $attrHash->{Dividende_Currency} = $attrHash->{Currency};
+            $attrHash->{Quantity}           = $attrArr[1];
+            $attrHash->{Price_Buy}          = $attrArr[2];  # ToDo: Umrechnen
+            $attrHash->{Dividende_Share}    = $attrArr[3] || '0';  # ToDo: Umrechnen
+            $attrHash->{Branche}            = $attrArr[4] || '';
+            $attrHash->{Last}               = (defined($attrArr[5]) && $attrArr[5] =~ m/^([-+]?)([0-9]*).*$/) ? $attrArr[5] : 0;
+          } else {
+            # Neue JSON Notation: {Currency:"CAD", Quantity:740, Price_Buy:10433.2, Dividende_Share:0.147, Branche:"Rohstoff", WKN:1234567,  Name:"Willi was here"}
+            $attrHash = decode_json $exg_anz_prz;
+            $attrHash->{Currency}           ||= 'EUR';
+            if (!defined(code2currency($attrHash->{Currency}))) {
+              Trace->Trc('I', 2, 0x02213, $attrHash->{Currency});
+              next;
+            }
+            $attrHash->{Dividende_Currency} ||= $attrHash->{Currency};
+            if (!defined(code2currency($attrHash->{Dividende_Currency}))) {
+              Trace->Trc('I', 2, 0x02213, $attrHash->{Dividende_Currency});
+              next;
+            }
+            $attrHash->{Last}            = 0 if (!defined($attrHash->{Last}) || ($attrHash->{Last} !~ m/^([-+]?)([0-9]*).*$/));
+          }
+
+          $self->{Portofolios}{$PFName}{$ppos}{Dividende_Share} = 0;
+          $self->{Portofolios}{$PFName}{$ppos}{Branche}         = '';
+          $self->{Kurs}{$pos}{_Waehrung}                        = defined($attrHash->{Currency}) ? $attrHash->{Currency} : 'EUR';
+          $self->{Kurs}{$pos}{_last}                            = $attrHash->{Last};
+
+          foreach (keys(%{$attrHash})) {
+            $self->{Portofolios}{$PFName}{$ppos}{$_}            = defined($attrHash->{$_}) ? $attrHash->{$_} : '';
+          }
           
           if (looks_like_number($self->{Portofolios}{$PFName}{$ppos}{Quantity}) && $self->{Portofolios}{$PFName}{$ppos}{Quantity} && 
               looks_like_number($self->{Portofolios}{$PFName}{$ppos}{Price_Buy})) {
             $self->{Portofolios}{$PFName}{$ppos}{Price_Buy_Share} = $self->{Portofolios}{$PFName}{$ppos}{Price_Buy} / $self->{Portofolios}{$PFName}{$ppos}{Quantity};
           } else {
-            Trace->Trc('I', 2, 0x0220f, $self->{Portofolios}{$PFName}{$ppos}{Quantity}, looks_like_number($self->{Portofolios}{$PFName}{$ppos}{Quantity}), $self->{Portofolios}{$PFName}{$ppos}{Price_Buy}, looks_like_number($self->{Portofolios}{$PFName}{$ppos}{Price_Buy}));
-            $self->{Portofolios}{$PFName}{$ppos}{Price_Buy_Share} = '';
+            Trace->Trc('I', 2, 0x0220f, $PFName, $ppos, $self->{Portofolios}{$PFName}{$ppos}{Quantity}, looks_like_number($self->{Portofolios}{$PFName}{$ppos}{Quantity}), $self->{Portofolios}{$PFName}{$ppos}{Price_Buy}, looks_like_number($self->{Portofolios}{$PFName}{$ppos}{Price_Buy}));
+            $self->{Portofolios}{$PFName}{$ppos}{Price_Buy_Share} = '0';
           }
         } ## end foreach my $exg_anz_prz (@stockattributearray)
       } ## end foreach my $pos (keys %{$PFHash...})
@@ -859,58 +967,36 @@ sub Kurse_ermitteln {
   # Kurs ermitteln
   # Ergebnis ist in $self->{Kurs} abgelegt
 
-  # Methode YAHOO
-  if (Configuration->config('Stockservice', 'Source') eq 'YAHOO') {
-    foreach (sort keys %{$self->{Kurs}}) {
-      my @symbols = split('\|', $_);
-      while ((my $symbol = shift(@symbols)) && !($self->{Kurs}{$_}{last})) {
-        # Fuer jedes Symbol den Abruf machen sofern noch kein Kurs feststeht
-        $self->_webabruf_YAHOO($symbol, $self->{Kurs}{$_}, \(keys %{$self->{Flags}}));
-        if ($self->{Kurs}{$_}{_last}) {
-          $self->{Kurs}{$_}{last} = $self->{Kurs}{$_}{_last}
-        }
-      }
-    }
-  }
-
   # Methode Finance::Quote
-  if (Configuration->config('Stockservice', 'Source') eq 'Finance::Quote') {
-    # Array ueber alle Symbole erstellen
-    my @markets = split(' ', Configuration->config('Stockservice', 'Markets'));
-    if (!@markets) {@markets = (qw/vwd europe/)};
-
-    my %symbolhash;
-    # Waehrungen aus %kurs extrahieren
-    foreach (keys %{$self->{Kurs}}) {
-      foreach my $symbol (split('\|', $_)) {
-        $symbolhash{$symbol} = $_;
-      }
-    }
-
+  if (defined(Configuration->config('Stockservice Finance::Quote'))) {
     $self->_webabruf_QUOTE();
-    
-    foreach my $symbol (keys %{$self->{Kurs}}) {
-      if ($self->{Kurs}{$symbol}{_Waehrung} ne 'EUR') {
-        foreach my $EUR (keys %{$self->{Kurs}{$symbol}}) {
-          if (defined($self->{Kurs}{$symbol}{$EUR . '_RAW'})) {
-            my $xsymbol = 'EUR' . $self->{Kurs}{$symbol}{_Waehrung} . '=X';
-            if ($self->{Kurs}{$xsymbol}{last}) {
-              Trace->Trc('I', 5, 0x02103, $xsymbol, $self->{Kurs}{$xsymbol}{last});
-              $self->{Kurs}{$symbol}{$EUR . '_RAW'} = $self->{Kurs}{$symbol}{$EUR} * $self->{Kurs}{$xsymbol}{last}
-            }
-          }
-        }
-      }
-    }
   }
-  
+
+  # Methode YAHOO
+  if (defined(Configuration->config('Stockservice Yahoo'))) {
+    $self->_webabruf_YAHOO();
+  }
+
   # Kurse sollten abgeholt und in $self->{Kurs} gespeichert sein
   # jetzt bereinigen wir die geladenen Werte und setzen ggf. Defaults
-  foreach my $symbol (keys(%{$self->{Kurs}})) {
+  # Ausserdem werden Waehrungsfelder ggf. umgerechnet
+  foreach my $symbol (keys %{$self->{Kurs}}) {
     $self->{Kurs}{$symbol}{net} = 0 if (!defined($self->{Kurs}{$symbol}{net}));
     $self->{Kurs}{$symbol}{div} = 0 if (!defined($self->{Kurs}{$symbol}{div}));
     foreach my $attribute (keys(%{$self->{Kurs}{$symbol}})) {
       $self->{Kurs}{$symbol}{$attribute} =~ s/^\s*|\s*$//g
+    }
+    next if ($symbol =~ /=X$/);
+    if ($self->{Kurs}{$symbol}{_Waehrung} ne 'EUR') {
+      foreach my $field (keys %{$self->{Kurs}{$symbol}}) {
+        if (defined($self->{Kurs}{$symbol}{$field . '_RAW'})) {
+          my $xsymbol = 'EUR' . $self->{Kurs}{$symbol}{_Waehrung} . '=X';
+          if ($self->{Kurs}{$xsymbol}{last}) {
+            Trace->Trc('I', 5, 0x02103, $xsymbol, $self->{Kurs}{$xsymbol}{last});
+            $self->{Kurs}{$symbol}{$field . '_RAW'} = $self->{Kurs}{$symbol}{$field} * $self->{Kurs}{$xsymbol}{last}
+          }
+        }
+      }
     }
   }
 
@@ -936,6 +1022,7 @@ sub _calculate {
       $self->{Portofolios}{$depot}{$pos}{Change_Percent}     = $self->{Portofolios}{$depot}{$pos}{Price_Buy} ? 100 * $self->{Portofolios}{$depot}{$pos}{Change} / $self->{Portofolios}{$depot}{$pos}{Price_Buy} : 0;
       $self->{Portofolios}{$depot}{$pos}{Change_Day}         = $self->{Portofolios}{$depot}{$pos}{Quantity} * $self->{Kurs}{$symbol}{net};
       $self->{Portofolios}{$depot}{$pos}{Change_Day_Percent} = $self->{Kurs}{$symbol}{p_change};
+      $self->{Portofolios}{$depot}{$pos}{Change_Day_Percent} =~ s/%$// if (defined($self->{Portofolios}{$depot}{$pos}{Change_Day_Percent}));
       $self->{Portofolios}{$depot}{$pos}{Price_Last}         = $self->{Portofolios}{$depot}{$pos}{Price} - $self->{Portofolios}{$depot}{$pos}{Change_Day};
   
       $self->{Portofolios}{$depot}{$pos}{Dividende}          = $self->{Portofolios}{$depot}{$pos}{Quantity} * $self->{Portofolios}{$depot}{$pos}{Dividende_Share};
@@ -1004,26 +1091,6 @@ sub analysiere_Portofolios {
 
   no autovivification;
   
-#  sub spf ($$) {
-#    my $format = $_[0];
-#    my $text   = $_[1] || 0;
-#
-#    my $len = 5;
-#    if ($format =~ m/^%([-+]?)([0-9]*).*$/) {
-#      $len = $2;
-#      $len++ if $1 eq '+';
-#      $len = '%' . $len . 's';
-#    }
-#    $text = sprintf($format, $text);
-#    $text = reverse $text;
-#    $text =~ s:\.:,:g; # deutsches Komma als Dezimaltrenner
-#    $text =~ s/(\d\d\d)(?=\d)(?!\d*,)/$1./g;
-#    $text = scalar reverse $text;
-#    $text =~ s/^\s+|\s+$//g;
-#    $text = sprintf($len, $text);
-#    return $text;
-#  }
-
   sub rating {
     my $mode   = shift || 'asc';
     my $value  = shift || 0;
@@ -1032,7 +1099,7 @@ sub analysiere_Portofolios {
     my $blue   = shift || 0;
     my $green  = shift || 0;
     
-    if ($mode eq "asc") {
+    if ($mode eq "asc") {  # i.E.: mm -10, m -5, n 5, p 10 pp
       return 'mm'      if $value <= $red;
       return 'm'       if $value <= $yellow;
       return 'neutral' if $value < $blue;
@@ -1040,15 +1107,15 @@ sub analysiere_Portofolios {
       return 'pp';
     }
     
-    if ($mode eq "desc") {
-      return 'mm'      if $value <= $green;
-      return 'm'       if $value <= $blue;
-      return 'neutral' if $value < $yellow;
-      return 'p'       if $value < $red;
+    if ($mode eq "desc") {  # i.E.: mm 3, m 2, n 1, p 0 pp
+      return 'mm'      if $value >= $red;
+      return 'm'       if $value >= $yellow;
+      return 'neutral' if $value > $blue;
+      return 'p'       if $value > $green;
       return 'pp';
     }
     
-    if ($mode eq 'range') {
+    if ($mode eq 'range') {  # i.E.: mm 1, n 3, pp 6, n 10 mm
       return 'mm'      if $value <= $red;
       return 'mm'      if $value >= $green;
       return 'neutral' if $value <= $yellow;
@@ -1081,7 +1148,7 @@ sub analysiere_Portofolios {
     foreach my $pos (keys %{$self->{Portofolios}{$depot}}) {
       my $symbol = (split(' ', $pos))[0];
       # Position bewerten
-      $self->{Portofolios}{$depot}{$pos}{Rating}{LastTrade} = $symbol ? rating('desc',  defined($self->{Kurs}{$symbol}{_lastTrade}) ? $self->{Kurs}{$symbol}{_lastTrade} : 0, 3, 2, 1, 0) : 0;
+      $self->{Portofolios}{$depot}{$pos}{Rating}{LastTrade} = $symbol ? rating('desc',  defined($self->{Kurs}{$symbol}{_lastTrade}) ? $self->{Kurs}{$symbol}{_lastTrade} : 0, 10, 7, 2, 0) : 0;
       $self->{Portofolios}{$depot}{$pos}{Rating}{Win}       = rating('asc',   $self->{Portofolios}{$depot}{$pos}{Change_Percent}, -10, -5, 5, 10);
       $self->{Portofolios}{$depot}{$pos}{Rating}{DayWin}    = rating('asc',   $self->{Portofolios}{$depot}{$pos}{Change_Day_Percent}, -2, -1, 1, 2);
       $self->{Portofolios}{$depot}{$pos}{Rating}{Portion}   = rating('range', $self->{Portofolios}{$depot}{$pos}{Portion}, 0, 1, 3, 6, 10);
@@ -1118,13 +1185,15 @@ sub _createFormat {
 
   my $self = shift;
   
-  my %args = ('Ausgabe'    => '', 
+  my %args = ('Typ'        => '', 
+              'Ausgabe'    => '', 
               'Part'       => '', 
               'Depot'      => '', 
               'Position'   => '',
               'Background' => $self->{bg}->{normal},
               @_);
                 
+  my $type    = $args{'Typ'};
   my $ausgabe = $args{'Ausgabe'};
   my $part    = $args{'Part'};
   my $depot   = $args{'Depot'};
@@ -1141,22 +1210,34 @@ sub _createFormat {
   if ($part eq 'Data') {
     $formatHash{Portofolio} = $depot if defined($depot);
   }
-  $formatHash{Name}       = $pos if defined($pos);
+  $formatHash{Position}     = $pos if defined($pos);
 
   # Sharedefinitionen
   if (defined($self->{Kurs}{$symbol})) {
+    $formatHash{Symbol} = $symbol;
     foreach (keys %{$self->{Kurs}{$symbol}}) {
       $formatHash{$_} = $self->{Kurs}{$symbol}{$_} if (defined($self->{Kurs}{$symbol}{$_}));
     }
   }
 
   # Depotdefinitionen
-  foreach (keys %{$self->{Portofolios}{$depot}{$pos}}) {
-    if (!ref($self->{Portofolios}{$depot}{$pos}{$_}) && defined($self->{Portofolios}{$depot}{$pos}{$_})) {
-      $formatHash{$_} = $self->{Portofolios}{$depot}{$pos}{$_};
+  if ($type eq 'Portofolios') {
+    foreach (keys %{$self->{Portofolios}{$depot}{$pos}}) {
+      if (!ref($self->{Portofolios}{$depot}{$pos}{$_}) && defined($self->{Portofolios}{$depot}{$pos}{$_})) {
+        $formatHash{$_} = $self->{Portofolios}{$depot}{$pos}{$_};
+      }
     }
   }
-
+  
+  # Cashdefinitionen
+  if ($type eq 'Cash') {
+    my ($owner, $bank, $cur, $amount) = split('\|', $pos);
+    $formatHash{Inhaber}     = $owner  if defined($owner);
+    $formatHash{Bank}        = $bank   if defined($bank);
+    $formatHash{KtoWaehrung} = $cur    if defined($cur);
+    $formatHash{KtoStand}    = $amount if defined($amount);
+  }
+  
   # Konsolensteuerung (Farbe):
   # Shortcuts
   $formatHash{C} = color($self->{Color}->{'clear'});
@@ -1198,32 +1279,47 @@ sub _push {
 
   my $self = shift;
  
+  my $type    = shift;
   my $ausgabe = shift;
   my $depot   = shift;
   my $part    = shift;
+  
+  my $owner  = $depot;
 
   return if !defined(Configuration->config("Ausgabeformat_$ausgabe", $part));
   
   if ($part eq 'Data') {
-    # Ausgabe sortiert nach Name
+    # Ausgabe sortiert nach 'name' der Position
     # Falls keine Kurs existert erfolgt auch keine Ausgabe
     # Ausser bei der Summenausgabe
     my %sortlist;
-    foreach (keys %{$self->{Portofolios}{$depot}}) {
-      if ($depot eq 'Summe') {
-        next if ($_ eq 'Watchlist Summe');  # Das Watchlist Depot mit der Summe aller Depotpositionen soll nicht in der Auflistung der Depots erscheinen
-        $sortlist{uc($depot . $_)} = $_;
-      } else {
-        my $symbol = (split(' ', $_))[0];
-        if ($self->{Kurs}{$symbol}{name}) {
-          $sortlist{uc($self->{Kurs}{$symbol}{name} . $_)} = $_;
+    if ($type eq 'Portofolios') {
+      foreach (keys %{$self->{Portofolios}{$depot}}) {
+        if ($depot eq 'Summe') {
+          next if ($_ eq 'Watchlist Summe');  # Das Watchlist Depot mit der Summe aller Depotpositionen soll nicht in der Auflistung der Depots erscheinen
+          $sortlist{uc($depot . $_)} = $_;
+        } else {
+          my $symbol = (split(' ', $_))[0];
+          if ($self->{Kurs}{$symbol}{name}) {
+            $sortlist{uc($self->{Kurs}{$symbol}{name} . $_)} = $_;
+          }
+        }
+      }
+    }
+
+    if ($type eq 'Cash') {
+      foreach my $bank (keys %{$self->{Cash}{$owner}}) {
+        next if ($bank eq 'Summe');
+        foreach my $cur (keys %{$self->{Cash}{$owner}{$bank}}) {
+          $sortlist{"$owner|$bank|$cur"} = "$owner|$bank|$cur|$self->{Cash}{$owner}{$bank}{$cur}";
         }
       }
     }
 
     my $bg = $self->{Color}->{normal};
     foreach (sort keys %sortlist) {
-      my $format = $self->_createFormat('Ausgabe',    $ausgabe,
+      my $format = $self->_createFormat('Typ',        $type,
+                                        'Ausgabe',    $ausgabe,
                                         'Part',       'Data',
                                         'Depot',      $depot,
                                         'Position',   $sortlist{$_},
@@ -1235,7 +1331,8 @@ sub _push {
       push(@{$self->{Ausgabe}{$ausgabe}{$depot}}, $ausgabestring);
     }
   } elsif ($part eq 'Head') {
-    my $format = $self->_createFormat('Ausgabe',  $ausgabe,
+    my $format = $self->_createFormat('Typ',      $type,
+                                      'Ausgabe',  $ausgabe,
                                       'Part',     'Head',
                                       'Depot',    'Summe',
                                       'Position', $depot);  
@@ -1274,28 +1371,44 @@ sub schreibe_Ausgabe {
   # Abarbeitung aller Portofolios
   foreach my $depot (keys %{$self->{Portofolios}}) {
     foreach $ausgabe (keys %ausgabedatei) {
+      next if ($ausgabe eq 'Cash');                           # Hier werden nur Portofolios behandelt
       next if (($depot eq 'Summe') && ($ausgabe ne 'Summe')); # Depot Summe wird nur auf Ausgabe Summe geschrieben
       next if (($depot ne 'Summe') && ($ausgabe eq 'Summe')); # und sonst nichts
       Trace->Trc('I', 2, "Erzeuge Ausgabe fuer <$ausgabe>  Depot: <$depot>  Datei: <$ausgabedatei{$ausgabe}>.");
-      $self->_push($ausgabe, $depot, 'Head');
-      $self->_push($ausgabe, $depot, 'Sep');
-      $self->_push($ausgabe, $depot, 'Col');
-      $self->_push($ausgabe, $depot, 'Sep');
-      $self->_push($ausgabe, $depot, 'Data');
+      $self->_push('Portofolios', $ausgabe, $depot, 'Head');
+      $self->_push('Portofolios', $ausgabe, $depot, 'Sep');
+      $self->_push('Portofolios', $ausgabe, $depot, 'Col');
+      $self->_push('Portofolios', $ausgabe, $depot, 'Sep');
+      $self->_push('Portofolios', $ausgabe, $depot, 'Data');
+    }
+  }
+
+  # Abarbeitung der Cashliste
+  foreach my $owner (keys %{$self->{Cash}}) {
+    foreach $ausgabe (keys %ausgabedatei) {
+      next if ($ausgabe ne 'Cash');                           # Hier wird nur Cash behandelt
+      Trace->Trc('I', 2, "Erzeuge Ausgabe fuer <$ausgabe>  Inhaber: <$owner>  Datei: <$ausgabedatei{$ausgabe}>.");
+      $self->_push('Cash', $ausgabe, $owner, 'Head');
+      $self->_push('Cash', $ausgabe, $owner, 'Sep');
+      $self->_push('Cash', $ausgabe, $owner, 'Col');
+      $self->_push('Cash', $ausgabe, $owner, 'Sep');
+      $self->_push('Cash', $ausgabe, $owner, 'Data');
     }
   }
 
   # Ausgabedateien schreiben
+  my %tmpdatei;
   foreach my $ausgabe (keys %{$self->{Ausgabe}}) {
     foreach my $depot (keys %{$self->{Ausgabe}{$ausgabe}}) {
-      Trace->Trc('I', 2, 0x02501, $depot, Utils::extendString($ausgabedatei{$ausgabe}, "Depot|$depot"));
+      my $dateiname = Utils::extendString($ausgabedatei{$ausgabe}, "Depot|$depot|Inhaber|$depot");
+      Trace->Trc('I', 2, 0x02501, $depot, $dateiname);
       if (!CmdLine->argument(0) || $depot ne 'Summe') {
 
         # Anlegen
         #Trace->Log($ausgabe, Utils::extendString($ausgabedatei{$ausgabe} . '.tmp', "Depot|$depot")) or Trace->Exit(1, 0, 0x00010, $ausgabedatei{$ausgabe}, "Depot|$depot");
-        my $dateiname = Utils::extendString($ausgabedatei{$ausgabe}, "Depot|$depot");
         eval {mkpath(dirname($dateiname));};
-        open(DEPOT, '> ' . $dateiname . '.tmp');
+        $tmpdatei{$dateiname} = $$;
+        open(DEPOT, '>> ' . $dateiname . ".$$");
         while (my $line = shift(@{$self->{Ausgabe}{$ausgabe}{$depot}})) {
           print DEPOT "$line\n";
         }
@@ -1303,10 +1416,11 @@ sub schreibe_Ausgabe {
         # Schliessen und Umbenennen
         #$self->TerminateLog($ausgabe);
         close(DEPOT);
-        move($dateiname . '.tmp', $dateiname);
       } ## end if (!CmdLine->argument...)
     } ## end foreach my $depot (keys %{$self...})
   } ## end foreach my $ausgabe (keys %...)
+
+  foreach (keys %tmpdatei) {move("$_.$$", $_)}
 
   # Kursinfos löschen
   if (exists($self->{VarFile})) {
@@ -1318,153 +1432,6 @@ sub schreibe_Ausgabe {
 
   return $rc;
 } ## end sub schreibe_Ausgabe
-
-#sub _schreibe_Ausgabe {
-#  #################################################################
-#  # Schreiben der Ausgabedatei(en)
-#  # Ergebnis:
-#  #
-#
-#  # Prozedurnummer 5
-#  #
-#
-#  my $self = shift;
-#
-#  my $merker = $self->{subroutine};
-#  $self->{subroutine} = (caller(0))[3];
-#  Trace->Trc('S', 1, 0x00001, $self->{subroutine}, $self->{Eingabedatei});
-#
-#  no autovivification;
-#
-#  my $rc = 0;
-#  my ($dateiname, $format, $symbol);
-#  
-#  my $bg = $self->{BG}->{normal};
-#  # Farbdefinition Background:
-#  # N : Ruecksetzen der Farbe
-#  # W : Aenderung seit Kauf
-#  # D : Tagesaenderung
-#  # P : Portion am Gesamtvermoegen
-#  # Y : Dividende
-#  # L : Letzter Kurs veraltet
-#  my %fg = %{$self->{FG}};
-#
-#  # Abarbeitung aller Portofolios
-#  foreach my $depot (keys %{$self->{Portofolios}}) {
-#    # Ausgabe der Summeninformation und der Kopfzeile
-#    # Festsetzung Hintergrund und Aufbau Formatstring
-#    $bg     = $self->{BG}->{normal};
-#    $format = "Portofolio|$depot|";
-#    foreach my $pos (keys %{$self->{Portofolios}{Summe}{$depot}}) {
-#      $format .= "$pos|$self->{Portofolios}{Summe}{$depot}{$pos}|" if (!ref($self->{Portofolios}{Summe}{$depot}{$pos}));
-#    }
-#    foreach my $rating (keys %{$self->{Portofolios}{Summe}{$depot}{Rating}}) {
-#      $format .= "$rating|".color($fg{$self->{Portofolios}{Summe}{$depot}{Rating}{$rating}})."|";
-#    }
-#
-#    # Ausgabe der Header fuer TXT und CSV puffern
-#    foreach my $ausgabe (keys %ausgabedatei) {
-#      if ($self->{Portofolios}{Summe}{$depot}) {
-#        # Unterscheidung Depotuebersicht oder Einzeldepot
-#        my $summe = ($depot eq 'Summe') ? '_S' : '_';
-#        if (Configuration->config('Ausgabeformat', $ausgabe . $summe . 'Head')) {
-#          my $line = (Configuration->config('Ausgabeformat', $ausgabe . $summe . 'Trenn')) ? Configuration->config('Ausgabeformat', $ausgabe . $summe . 'Trenn') : '';
-#          push(@{$self->{Ausgabe}{$ausgabe}{$depot}}, Utils::extendString(Configuration->config('Ausgabeformat', $ausgabe . $summe . 'Head'), $format));
-#          push(@{$self->{Ausgabe}{$ausgabe}{$depot}}, $line);
-#          push(@{$self->{Ausgabe}{$ausgabe}{$depot}}, Utils::extendString(Configuration->config('Ausgabeformat', $ausgabe . $summe . 'Col'),  $format));
-#          push(@{$self->{Ausgabe}{$ausgabe}{$depot}}, $line);
-#        }
-#      } ## end if ($self->{Portofolios...})
-#    } ## end foreach my $ausgabe (keys %ausgabedatei)
-#
-#    # Aufbau der Einzeltitel
-#    my %sortlist;
-#    if ($depot eq 'Summe') {
-#      # Depotuebersicht
-#      foreach my $pos (keys %{$self->{Portofolios}{$depot}}) {
-#        if ($pos ne 'Summe' && (split(' ', $pos))[0] ne '1') {
-#          $sortlist{uc($pos)} = $pos;
-#        }
-#      }
-#    } else {
-#      # Einzeldepots
-#      foreach my $pos (keys %{$self->{Portofolios}{$depot}}) {
-#        $symbol = (split(' ', $pos))[0];
-#        if ($self->{Kurs}{$symbol}{name}) {
-#          $sortlist{uc($self->{Kurs}{$symbol}{name} . $pos)} = $pos;
-#        }
-#      }
-#    }
-#
-#    foreach my $key (sort(keys %sortlist)) {
-#      my $pos = $sortlist{$key};
-#      if ($pos ne 'Summe') {
-#        $bg = $bg eq $self->{BG}->{normal} ? $self->{BG}->{invers} : $self->{BG}->{normal};
-#        if ($depot eq 'Summe') {
-#          $format = "Depotname|$pos|";
-#          $format .= 'P|' . color($fg{$self->{Portofolios}{$depot}{$pos}{Rating}{Portion}}) . '|';
-#        } else {
-#          $symbol = (split(' ', $pos))[0];
-#          $format = "Symbollangname|" . (split('\|', $symbol))[0] . "|";
-#          # Durchfuehren der Einzelwertformatierung und
-#          # Einsammeln aller allgemeinen Einzelwertattribute
-#          foreach my $flag (keys %{$self->{Kurs}{$symbol}}) {
-#            if (defined($flag) && defined($symbol) && defined($self->{Kurs}{$symbol}{$flag})) {$format .= "$flag|$self->{Kurs}{$symbol}{$flag}|"};
-#          }
-#          $format .= 'P|' . color($fg{$self->{Portofolios}{$depot}{$pos}{Rating}{Portion}}) . '|';
-#          $format .= 'Y|' . color($fg{$self->{Portofolios}{$depot}{$pos}{Rating}{Dividende}}) . '|';
-#          $format .= 'L|' . color($fg{$self->{Portofolios}{$depot}{$pos}{Rating}{Last_Trade}}) . '|';
-#        } ## end else [ if ($depot eq 'Summe')]
-#        # Einsammeln aller depotspezifischen Einzelwertattribute
-#        foreach (keys %{$self->{Portofolios}{$depot}{$pos}}) {
-#          $format .= "$_|$self->{Portofolios}{$depot}{$pos}{$_}|";
-#        }
-#        $format .= 'C|' . color($self->{FG}->{neutral}) . '|';
-#        $format .= 'W|' . color($fg{$self->{Portofolios}{$depot}{$pos}{Rating}{Win}}) . '|';
-#        $format .= 'D|' . color($fg{$self->{Portofolios}{$depot}{$pos}{Rating}{Win_Day}}) . '|';
-#      } ## end if ($pos ne 'Summe')
-#
-#      foreach my $ausgabe (keys %ausgabedatei) {
-#        my $ausgabeType = ($depot eq 'Summe') ? "${ausgabe}_SBody" : "${ausgabe}_Body";
-#        if (Configuration->config('Ausgabeformat', $ausgabeType)) {
-#          push(@{$self->{Ausgabe}{$ausgabe}{$depot}}, Utils::extendString(Configuration->config('Ausgabeformat', $ausgabeType), $format));
-#        }
-#      }
-#    } ## end foreach (sort(keys %sortlist...))
-#  } ## end foreach my $depot (keys %{$self...})
-#
-#  # Ausgabedateien schreiben
-#  foreach my $ausgabe (keys %{$self->{Ausgabe}}) {
-#    foreach my $depot (keys %{$self->{Ausgabe}{$ausgabe}}) {
-#      Trace->Trc('I', 2, 0x02501, $depot, Utils::extendString($ausgabedatei{$ausgabe}, "Depot|$depot"));
-#      if (!CmdLine->argument(0) || $depot ne 'Summe') {
-#
-#        # Anlegen
-#        #Trace->Log($ausgabe, Utils::extendString($ausgabedatei{$ausgabe} . '.tmp', "Depot|$depot")) or Trace->Exit(1, 0, 0x00010, $ausgabedatei{$ausgabe}, "Depot|$depot");
-#        my $dateiname = Utils::extendString($ausgabedatei{$ausgabe}, "Depot|$depot");
-#        open(DEPOT, '> ' . $dateiname . '.tmp');
-#        while (my $line = shift(@{$self->{Ausgabe}{$ausgabe}{$depot}})) {
-#          print DEPOT "$line\n";
-#        }
-#
-#        # Schliessen und Umbenennen
-#        #$self->TerminateLog($ausgabe);
-#        close(DEPOT);
-#        move($dateiname . '.tmp', $dateiname);
-#      } ## end if (!CmdLine->argument...)
-#    } ## end foreach my $depot (keys %{$self...})
-#  } ## end foreach my $ausgabe (keys %...)
-#
-#  # Kursinfos löschen
-#  if (exists($self->{VarFile})) {
-#    eval {unlink($self->{VarFile});};
-#  }
-#
-#  Trace->Trc('S', 1, 0x00002, $self->{subroutine});
-#  $self->{subroutine} = $merker;
-#
-#  return $rc;
-#} ## end sub schreibe_Ausgabe
 
 
 1;

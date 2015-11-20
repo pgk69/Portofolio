@@ -2,232 +2,142 @@
 Name             = PORTOFOLIO
 # Looptime       = 5
 Testmode         = 0
-LockFile         = PORTOFOLIO.pid
-VarFile          = PORTOFOLIO.var
+LockFile         = ~/.portofolio/PORTOFOLIO.pid
+# VarFile          = ~/.portofolio/PORTOFOLIO.var
 PosAufsummieren  = 1
+Gesamtliste      = Summe
+BasisCurrency    = EUR
 
 [Debug]
 Level            = 2
-#File          =
+Events           = DISML
+# File          =
 File          = |1
-# File          = /var/log/PORTOFOLIO/$JAHR$$MONAT$$TAG$.$PID$.dbg|1
+# File          = ~/Work/PORTOFOLIO/$JAHR$$MONAT$$TAG$.$PID$.dbg|1
 
-[DB]
-RDBMS            = mysql
-DBNAME           = DB
-USER             = $ENV(DB_USER)$
-PASSWD           = $ENV(DB_PASSWD)$
+[Color]
+clear            = clear
+reset            = white on_ansi0
+
+normal           = on_ansi0
+invers           = on_grey5
+
+pp               = bright_green
+p                = bright_cyan
+neutral          = bright_white
+m                = bright_magenta
+mm               = bright_red
+
+[Eingabedatei]
+Portofolios      = depots.ini
+Watchlists       = watchlists.ini
 
 [Ausgabedatei]
-Display          = ~/$Depot$.txt
-CSV              = ~/$Depot$.csv
+Summe            = ~/.portofolio/$Depot$.txt
+Depot            = ~/.portofolio/$Depot$.txt
+Export           = ~/Work/PORTOFOLIO/$Depot$.csv
+Cash             = ~/Work/PORTOFOLIO/Cash.csv
 
-[Ausgabeformat]
-# Display
-Display_Head   = $CK$$Name%-20s$ $CT$$TAG$.$MONAT$.$JAHR$ $STUNDE$:$MINUTE$: $Pos_Day_Change_Percent%7s$%  $Pos_Day_Change%6s$€  $CK$Kaufwert: $Pos_Buy_Price%6s$€  aktueller Wert: $Pos_Price%6s$€  Aenderung: $Pos_Change%6s$€ ($Pos_Change_Percent%7s$%)$CC$
-Display_Col    = Name                 Symbol     Boerse     |    Preis  Diff %         €          ∑      Pos ∑ | Anzahl | EK-Preis   Diff. %           €          ∑ |  Anteil |  Div %        €         ∑ | Letzter Handel$CC$
-Display_Trenn  = -------------------------------------------+--------------------------------------------------+--------+-------------------------------------------+---------+---------------------------+---------------
-Display_Body   = $CK$$n$ $s$ $x$ $CC$| $CT$$l1$€  $p2$%  $c1$€  $Pos_Day_Change$€  $Pos_Price$€ $CC$| $Pos_Quantity%6s$ $CC$| $CK$$Share_Buy_Price%7s$€  $Pos_Change_Percent$%  $Pos_Change$€  $Pos_Buy_Price$€ $CC$| $CA$$Pos_Anteil%6s$% $CC$| $CD$$y$%  $d$€  $Pos_Div_Summe%7s$€ $CC$| $CL$$_Tradetime$$CC$
+  # Konsolensteuerung (Farbe):
 
-Display_SHead  = $CK$$Name%-15s$ $CT$$TAG$.$MONAT$.$JAHR$ $STUNDE$:$MINUTE$: $Pos_Day_Change_Percent%7s$%  $Pos_Day_Change%6s$€  $CK$Kaufwert: $Pos_Buy_Price%6s$€  aktueller Wert: $Pos_Price%6s$€  Aenderung: $Pos_Change%6s$€ ($Pos_Change_Percent%7s$%)$CC$
-Display_SCol   = Name            |   Preis      | Diff %            €  |     EK-Preis       Diff. €        %  | Anteil$CC$
-Display_STrenn = ----------------+--------------+----------------------+--------------------------------------+-------
-Display_SBody  = $CK$$Name%-15s$$CC$ |$CT$$Pos_Price$€ $CC$| $Pos_Day_Change_Percent$%  $Pos_Day_Change$€  $CC$|$CK$$Pos_Buy_Price$€  $Pos_Change$€  $Pos_Change_Percent$% $CC$ |$CA$$Pos_Anteil%6s$%$CC$
+  # Zur Steuerung koennen alle unter [Color] definierten Werte verwendet werden
+  # (normal, invers, clear, pp, p, neutral, n, mm)
+  # Zusaetzlich koennen Shortcuts verwendet werden:
+  
+  # C - clear  : Clearscreen
 
-CSV_Body  = $n$$\x09$$l1$$\x09$$Pos_Quantity$$\x09$$Pos_Buy_Price$$\x09$$s$
+  # Back- and Foreground
+  # R - reset  : Ruecksetzen der Fordergrund- und Hintergrundfarbe
+
+  # Background
+  # N - normal : Normaler Hintergrund
+  # I - invers : Invertierter den Hintergrund
+  # B          : Aktueller Background, normal oder invers
+
+  # Foreground anhaengig von dem auszugebenden Wert pp, p, neutral, m oder mm
+  # W : Aenderung seit Kauf
+  # D : Tagesaenderung
+  # P : Portion am Gesamtvermoegen
+  # Y : Dividende
+  # L : Letzter Kurs veraltet
+[Ausgabeformat_Summe]
+Head = $W$Summe  $D$$TAG$.$MONAT$.$JAHR$ $STUNDE$:$MINUTE$: $Change_Day_Percent%5.2f$%  $Change_Day%8.2f$€ $W$Kaufwert: $Price_Buy%9.2f$€ aktueller Wert: $Price%9.2f$€ Aenderung: $Change%9.2f$€ ($Change_Percent%.2f$%) Dividende: $Dividende%5.2f$€ ($Dividende_Percent%.2f$%)$R$
+Col  = Name                           | Preis       |  Diff %             € | EK-Preis          Diff. €       % |  Anteil |  Div %          € 
+Sep  = -------------------------------+-------------+-----------------------+-----------------------------------+---------+------------------
+Data = $B$$W$$Position%-30.30s$$N$ |$D$ $Price%10.2f$€ $N$| $Change_Day_Percent%6.2f$% $Change_Day%12.2f$€ $N$|$W$ $Price_Buy%10.2f$€ $Change%12.2f$€ $Change_Percent%6.2f$% $N$| $P$$Portion%5.2f$% $N$| $W$$Dividende_Percent%5.2f$% $Dividende%9.2f$€ $R$
+
+[Ausgabeformat_Depot]
+Head = $W$$Portofolio%-20.20s$ $D$$TAG$.$MONAT$.$JAHR$ $STUNDE$:$MINUTE$: $Change_Day_Percent%5.2f$%  $Change_Day%7.2f$€  $W$Kaufwert: $Price_Buy%9.2f$€  aktueller Wert: $Price%9.2f$€  Aenderung: $Change%8.2f$€ ($Change_Percent%.2f$%)  Dividende: $Dividende%5.2f$€ ($Dividende_Percent%.2f$%)$R$
+Col  = Name                 Symbol       Quelle     |    Preis   Diff %        €         ∑       Pos ∑ | Anzahl | EK-Preis  Diff. %          €           ∑ | Anteil |  Div %        €          ∑  | Letzter Handel$R$
+Sep  = ---------------------------------------------+--------------------------------------------------+--------+------------------------------------------+--------+-----------------------------+---------------
+Data = $B$$W$$name%-20.20s$ $symbol%-12.12s$ $exchange%-10.10s$ $N$| $D$$last%7.2f$€ $p_change%7.2f$% $net%7.2f$€ $Change_Day%8.2f$€ $Price%10.2f$€ $N$| $Quantity%6.6s$ $N$| $W$$Price_Buy_Share%7.2f$€ $Change_Percent%7.2f$% $Change%9.2f$€ $Price_Buy%10.2f$€ $N$| $P$$Portion%5.2f$% $N$| $Y$$Dividende_Percent%5.2f$% $Dividende_Share%7.2f$€ $Dividende%10.2f$€ $N$| $L$$_Tradetime$$R$
+
+[Ausgabeformat_Export]
+Data = $name$$\x09$$last_RAW%.2f$$\x09$$_Waehrung$$\x09$$last%.2f$$\x09$$Quantity$$\x09$$Price_Buy%.2f$$\x09$$Symbol$$\x09$$Dividende_Share%.2f$$\x09$$Branche$
+
+[Ausgabeformat_Cash]
+Data = $Inhaber$$\x09$$Bank$$\x09$$KtoWaehrung$$\x09$$KtoStand%.2f$
+
+[Stockservice Yahoo]
+Anzahl_Versuche  = 10
+URL              = http://download.finance.yahoo.com/d/quotes.csv?s=$STOCK$&f=$DATA$&e=.csv
+
+[Stockservice Finance::Quote]
+Markets          = fidelity vwd europe 
+# Markets          = fidelity dwsfunds usa nyse nasdaq australia canada tiaacref troweprice uk_unit_trusts vanguard europe vwd
 
 [Stockservice]
-URL              = http://download.finance.yahoo.com/d/quotes.csv?s=$STOCK$&f=$DATA$&e=.csv
-Anzahl_Versuche  = 10
+MaxDelay         = 3600000
+UTCDelta         = 7200
 
-[Stockinfos]
 # nsxbc1p2ydd1t1
 # Name Symbol Stock_Exchange Bid Change Change_Percent Dividend_Yield Last_Trade_Date Last_Trade_Time
 
+# Variablenname = Kurzname(Abbr) Beschreibung(Flag) Faktor Laenge Default Format
+
 # Pricing
-l1               = Last_Trade_Price 1 %7.2f
-#a                = Ask 1
-#b                = Bid 1
-#b2               = Ask_Realtime 1
-#b3               = Bid_Realtime 1
-#p                = Previous_Close 1
-#o                = Open 1
-c1               = Change 1 %+7.2f
-#c                = Change_Percent_Change 0
-#c6               = Change_Realtime 1
-#k2               = Change_Percent_RT 0
-p2               = Change_Percent 0 %+5.2f
-#c8               = After_Hours_Change_RT 1
-#c3               = Commission 1
-#g                = Days_Low 1
-#h                = Days_High 1
-#k1               = Last_Trade_RT 1
-#l                = Last_Trade 1
-#t8               = 1_yr_Target_Price 1
-#w1               = Days_Value_Change 1
-#w4               = Days_Value_Change_RT 1
-#p1               = Price_Paid 1
-#m                = Days_Range 1
-#m2               = Days_Range_RT 1
-
-# 52 Week Pricing
-#k                = 52_Week_High 1
-#j                = 52_Week_Low 1
-#k4               = 52_Week_High_Change 1
-#j5               = 52_Week_Low_Change 1
-#k5               = 52_Week_High_Change_Percent 0
-#j6               = 52_Week_Low_Change_Percent 0
-#w                = 52_Week_Range 1
-
-# Volume
-#v                = Volume 0
-### a5               = Ask_Size 0
-### b6               = Bid_Size 0
-### k3               = Last_Trade_Size 0
-#a2               = Average_Daily_Volume 0
-
-# Ratios
-#e                = Earnings_per_Share 1
-#e7               = EPS_Estimate_Current_Year 1
-#e8               = EPS_Estimate_Next_Year 1
-#e9               = EPS_Estimate_Next_Quarter 1
-#b4               = Book_Value 1
-#j4               = EBITDA 1
-#p5               = Price_Sales_Ratio 0
-#p6               = Price_Book_Ratio 0
-#r                = P_E_Ratio 0
-#r2               = P_E_Ratio_RT 0
-#r5               = PEG_Ratio 0
-#r6               = Price_EPS_Ratio_Estimate_Current_Year 0
-#r7               = Price_EPS_Ratio_Estimate_Next_Year 0
-#s7               = Short_Ratio 0
+Info last      = l1 Last_Trade_Price 2 7 0 %7.2f
+Info net       = c1 Change 2 - 0 %+7.2f
+Info p_change  = p2 Change_Percent 2 5 0 %+5.2f
 
 # Dividends
-y                = Dividend_Yield 0 %5.2f
-d                = Dividend_per_Share 1 %6.2f
-#r1               = Dividend_Pay_Date 0
-#q                = Ex_Dividend_Date 0
+Info div_yield = y Dividend_Yield 0 6 0 %5.2f
+Info div       = d Dividend_per_Share 1 5 0 %6.2f
 
 # Date
-d1               = Last_Trade_Date 0 %10s
-#d2               = Trade_Date 0
-t1               = Last_Trade_Time 0 %7s
-
-# Averages
-#m3               = MA_50D 1
-#m7               = MA_50D_Change 1
-#m8               = MA_50D_Change_Percent 0
-#m4               = MA_200D 1
-#m5               = MA_200D_Change 1
-#m6               = MA_200D_Change_Percent 0
-
-# Performance
-#g1               = Holdings Gain Percent 0
-#g3               = Annualized Gain 1
-#g4               = Holdings Gain 1
-#g5               = Holdings Gain Percent_RT 0
-#g6               = Holdings Gain_RT 1
+Info date      = d1 Last_Trade_Date 0 10 - %10s
+Info time      = t1 Last_Trade_Time 0 10 - %7s
 
 # Symbol Info
-#i                = More_Info 0
-#j1               = Market_Capitalization 0
-#j3               = Market_Cap_RT 0
-### f6               = Float_Shares 0
-n                = Name 0 %-20s
-#n4               = Notes 0
-s                = Symbol 0 %-10s
-#s1               = Shares_Owned 0
-x                = Stock_Exchange 0 %-10s
+Info name      = n Name 0 20 - %-20s
+Info symbol    = s Symbol 0 12 - %-12s
+Info exchange  = x Stock_Exchange 0 10 - %-10s
 
-# Misc
-#e1               = Error_Indication 0
-#t7               = Ticker_Trend 0
-### t6               = Trade_Links 0
-#i5               = Order_Book_RT 0
-#l2               = High_Limit 1
-#l3               = Low_Limit 1
-#v1               = Holdings_Value 0
-#v7               = Holdings_Value_RT 0
+# Several others (generic)
+Info Branche            =
+Info Change_Day_Percent =
+Info Dividende_Percent  =
+Info Dividende_share    =
+Info Price_Buy_Share    =
+Info Price_Share        =
+Info _Tradetime         =
+Info _Waehrung          =
+Info _aktuell           =
+Info _last              =
+Info _lastTrade         =
+Info _letzter_Abruf     =
+Info _tradetime         =
+Info dir_RAW            =
+Info last_RAW           =
+Info net_RAW            =
 
-[Portofolio Portofolio1]
-PHM7.DE   = EUR 440 10057.08
-AEC1.F    = EUR 288 10055.97
-ABX.TO    = CAD 340 5007.18
-BIL.DE    = EUR 240 5019.36
-4XS.F     = EUR 277 10035.71
-FZ17.BE   = EUR 25 2094.65
-GS7.DE     = EUR 510 9945
-HAW.DE    = EUR 520 20050.35
-SDF.DE    = EUR 160 5120
-KIN2.F    = EUR 850 10229.03
-KIN2.F    = EUR 460 4847.94
-KPN.DE    = EUR 1800 5040
-LXS.DE    = EUR 80 4960
-LIN.DE    = EUR 50 5496.16
-M5Z.DE    = EUR 225 10031.67
-M5Z.DE    = EUR 170 5120.4
-MEO.DE    = EUR 475 10101.58 21.2665
-MTX.DE    = EUR 90 5142.83
-MUV2.DE   = EUR 120 10226.75
-MS        = USD 330 5055.6
-NUO.AS    = EUR 150 5023.5
-OPAP.AT   = EUR 2000 9956.35
-RWE.DE    = EUR 282 10036.03
-SAN.PA    = EUR 140 9982
-SVE.DE    = EUR 167 5377.45
-SVE.DE    = EUR 50 2025.5
-SNG.DE    = EUR 1900 5047.59
-SIX2.DE   = EUR 740 10014.99
-DNQ.DE      = EUR 520 10165.35
-DNQ.DE      = EUR 530 10070
-TNE5.F    = EUR 667 10035.81
-TNE5.F    = EUR 821 10186.65
-UNH.F     = EUR 320 10048.34
-VER.VI    = EUR 310 5022.93
-WKL.AS    = EUR 300 4936.5
-
-[Portofolio Dad]
-ALV.DE     = EUR 200 19380
-DAI.DE     = EUR 200 9291
-DBK.DE     = EUR 1500 61552.5
-MEO.DE     = EUR 930 44519.1
-MSF.F      = EUR 240 4282.8
-MUV2.DE    = EUR 300 32445
-PRG.F      = EUR 438 20489.21
-# Split in Siemens und Osram
-# SIE.DE     = EUR 150 13743
-SIE.DE     = EUR 150 12483.64
-SIE.DE     = EUR 15 1243.6
-
-[Portofolio Musterdepot 1]
-ALV.DE       = EUR 50 3345.86
-BPE5.DE      = EUR 4300 22422.61
-GSZ.PA       = EUR 500 9925.49
-GGQ1.DE      = EUR 20 7273.55
-HMSB.DE      = EUR 350 7007.85
-JNJ.F        = EUR 550 25052.73
-MDT.F        = EUR 900 22889.36
-NDJV.MU      = EUR 1000 23325.9
-NOT.DE       = EUR 400 15472.35
-OMV.F        = EUR 300 7236.33
-PETR3.SA     = USD 600 11315.45
-RWE.DE       = EUR 200 5810.59
-SAN.PA       = EUR 150 6986.85
-TIT.MI       = EUR 10000 8096.85
-TCO.F        = EUR 3500 15582.95
-TCO.F        = EUR 3000 11592.22
-TEV.F        = EUR 350 9800
-FP.PA        = EUR 620 23531.09
-
-[Portofolio Portofolio 2]
-COM.DE     = EUR 2000 22227.5
-DWW9.SG    = EUR 60 4763.3
-HJUU.SG    = EUR 50 4291.5
-FTE.F      = EUR 500 5600
-HAW.DE     = EUR 200 3394.8
-JPJF.SG    = EUR 180 3178.93
-NLB1.F     = EUR 390 5405.4
-SCMN.VX    = CHF 24 7708.32
-TCO.F      = EUR 1300 4966
-TEV.F      = EUR 270 9987.3
-UTDI.DE    = EUR 1000 10000
+# Only for Depotvalues
+# Info Change             =
+# Info Change_Day         =
+# Info Div_Summe          =
+# Info Dividende          =
+# Info Portion            =
+# Info Price              =
+# Info Price_Buy          =
+# Info Price_Last         =
+# Info Quantity           =
