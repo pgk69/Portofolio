@@ -105,15 +105,19 @@ if ($@) {
 #-------------------------------------------------------------------------------
 # PRGRAMM-Start
 #-------------------------------------------------------------------------------
-$prg->lese_Portofolios(CmdLine->argument());
-$prg->extract_Cash();
-$prg->erzeuge_Gesamtliste() if ($prg->{Gesamtliste});
-$prg->parse_Positionen();
-$prg->ergaenze_Wechselkurse();
+$prg->Flags_laden();
+$prg->Portofolios_lesen(CmdLine->argument());
 
+$prg->Cash_extrahieren();
+$prg->Gesamtliste_erzeugen() if ($prg->{Gesamtliste});
+$prg->Positionen_parsen();
+
+$prg->Wechselkurse_lesen();
 $prg->Kurse_ermitteln();
-$prg->analysiere_Portofolios();
-$prg->schreibe_Ausgabe();
+
+$prg->Kurse_ergaenzen();
+$prg->Portofolios_analysieren();
+$prg->Ausgabe_schreiben();
 
 $prg->Exit(0, 1, 0x00002, $prg->prg, $VERSION);
 
