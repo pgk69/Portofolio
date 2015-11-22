@@ -198,6 +198,9 @@ sub _init {
   # Rücksichern der Variablenwerte
   if (Configuration->config('Prg', 'VarFile') && !CmdLine->option('flush')) {
     $self->{VarFile} = Utils::extendString(Configuration->config('Prg', 'VarFile'), "BIN|$Bin|SCRIPT|" . uc($Script));
+    if (exists($self->{VarFile})) {
+      eval {$self->{Kurs} = retrieve($self->{VarFile});};
+    }
   }
 
   # BasisWaehrung festlegen
@@ -436,27 +439,21 @@ sub _webabruf_QUOTE {
   $quoter->set_currency($self->{BasisCur});  # Set default currency.
   # Wechselkurse ermitteln
   foreach (keys(%{$self->{Exchangerate}})) {
-    $self->{Exchangerate}{$_}{Rate} = $quoter->currency($self->{BasisCur}, $self->{Exchangerate}{$_}{Currency});
+    $self->{Exchangerate}{$_}{Rate}         = $quoter->currency($_, $self->{BasisCur});
+    $self->{Exchangerate}{$_}{Reverse_Rate} = 1/$self->{Exchangerate}{$_}{Rate};
   }
       
   # Array ueber alle Symbole erstellen
   my @markets = split(' ', Configuration->config('Stockservice Finance::Quote', 'Markets'));
   if (!@markets) {@markets = (qw/vwd europe/)};
 
-  my %symbolhash;
-  # Tickersymbole %Kurs extrahieren
-  foreach (keys %{$self->{Kurs}}) {
-    foreach my $symbol (split('\|', $_)) {
-      $symbolhash{$symbol} = $_
-    }
-  }
-
   foreach my $quelle (@markets) {
     Trace->Trc('I', 2, 0x02105, $quelle);
     my @symbols;
-    foreach (sort keys %symbolhash) {
-      if (!$self->{Kurs}{$symbolhash{$_}}{aktuell} && 
-         (!$self->{Kurs}{$symbolhash{$_}}{letzter_Abruf} || ($self->{Kurs}{$symbolhash{$_}}{letzter_Abruf} < time - $self->{MaxDelay}))) {
+    foreach (sort keys %{$self->{Kurs}}) {
+      if (!$self->{Kurs}{$_}{aktuell} && 
+          (!$self->{Kurs}{$_}{letzter_Abruf} || 
+           ($self->{Kurs}{$_}{letzter_Abruf} < time - $self->{MaxDelay}))) {
         push(@symbols, $_)
       }
     }
@@ -467,7 +464,7 @@ sub _webabruf_QUOTE {
       foreach my $symbol (@symbols) {
         next if !$info{$symbol,"success"};       # Skip failures.
         next if $info{$symbol,"last"} eq '0,00'; # Skip failures.
-        my $hashptr = $self->{Kurs}{$symbolhash{$symbol}};
+        my $hashptr = $self->{Kurs}{$symbol};
         my %value;
         foreach (keys %{$self->{Flags}}) {
           # Ergebnisse auswerten
@@ -475,7 +472,7 @@ sub _webabruf_QUOTE {
           if (!defined($infoval)) {
             $infoval = $self->{Flags}{$_}{Default};
           }
-          if ($self->{Flags}{$_}{Laenge}) {
+          if (defined($infoval) && $self->{Flags}{$_}{Laenge}) {
             $infoval = substr($infoval, 0, $self->{Flags}{$_}{Laenge})
           }
           $value{$_} = $infoval;
@@ -532,6 +529,7 @@ sub _webabruf_QUOTE {
 sub Flags_laden {
   #####################################################################
   # Laden der Flags aus der INI-Datei
+  # Anlegen des DEFAULT Kusreintrags
   #
   # Ergebnis: Datenstruktur $self->{Flags} mit folgendem Aufbau
   # $self->{Flags}->{<Flagname>}
@@ -549,6 +547,8 @@ sub Flags_laden {
   Trace->Trc('S', 1, 0x00001, $self->{subroutine}, $self->{Eingabedatei});
 
   my $rc = 0;
+  
+  # Anlegen der mandatorischen Kursfelder
 
   # Aufbau der Info Flags
   my %stockInfos = Configuration->config('Stockservice');
@@ -556,18 +556,17 @@ sub Flags_laden {
 
   foreach (keys %stockInfos) {
     next if ($_ !~ /^Info (.*)$/);
-    my ($yahoo, $quote, $faktor, $laenge, $default, @format) = split(' ', $stockInfos{$_});
-    $yahoo  = ''  if (!defined($yahoo)   || $yahoo eq '-');
-    $quote  = ''  if (!defined($quote)   || $quote eq '-');
-    $faktor = 0   if (!defined($faktor)  || $faktor eq '-');
-    $laenge = 0   if (!defined($laenge)  || $laenge eq '-');
-    $default = '' if (!defined($default) || $default eq '-');
+    my ($yahoo, $quote, $faktor, $format, $default) = split(' ', $stockInfos{$_});
+    $yahoo  = ''     if (!defined($yahoo)   || $yahoo eq '-');
+    $quote  = ''     if (!defined($quote)   || $quote eq '-');
+    $faktor = 0      if (!defined($faktor)  || $faktor eq '-');
+    $format = undef  if (!defined($format)  || $format eq '-');
+    $default = undef if (!defined($default) || $default eq '-');
     $flags{$1} = {Yahoo   => $yahoo,
                   Quote   => $quote,
                   Faktor  => $faktor,
-                  Laenge  => $laenge,
                   Default => $default,
-                  Format  => join(' ', @format) || '%s'};
+                  Format  => $format};
   }
 
   $self->{Flags} = \%flags;
@@ -818,40 +817,41 @@ sub Positionen_parsen {
   my %PFHash = %{$self->{PFHash}};
   delete($self->{PFHash});
   
-  if (exists($self->{VarFile})) {
-    eval {$self->{Kurs} = retrieve($self->{VarFile});};
-  }
-
   # Datenstruktur zum Sammeln der Kursinformatinen zu allen Positionen anlegen
   # und mit Werten aus der INI fuellen
-  foreach my $PFName (sort(keys(%PFHash))) {
+  foreach my $PFName (keys(%PFHash)) {
     # Fuer jedes gefundene Protofolio/jede Watchlist, der/die Elemente (Aktienpositionen) enthaelt
     if (scalar keys %{$PFHash{$PFName}}) {
-      foreach my $lpos (keys %{$PFHash{$PFName}}) {
-        my $pos = (split(/\./, $lpos))[0];
+      foreach my $pos_alternativs (keys %{$PFHash{$PFName}}) {
+        my $pos_alternativs_sort = join("|", sort(split(/\|/, $pos_alternativs)));
+        my $pos = (split(/\./, $pos_alternativs_sort))[0];
         # Fuer jede Aktienposition
         # Falls die Position mehrfach vorkommt sammle alle Vorkommen in einem Array
         # Falls die Position nur einmal vorkommt schieb das Element in den Array
-        my @stockattributearray = ref($PFHash{$PFName}{$lpos}) ? @{$PFHash{$PFName}{$lpos}} : $PFHash{$PFName}{$lpos};
+        my @stockattributearray = ref($PFHash{$PFName}{$pos_alternativs}) ? @{$PFHash{$PFName}{$pos_alternativs}} : $PFHash{$PFName}{$pos_alternativs};
         # Im Array @stockattributearray liegen ein oder mehrere Elemente
-        # Uebernahme der Elemente in das Protofolio und Setzen der Defaults
+        # Uebernahme der Elemente in das Portofolio und Setzen der Defaults
         my $poscount = 1;
         foreach my $exg_anz_prz (@stockattributearray) {
+          # Ermitteln den eindeutigen Index
           Trace->Trc('I', 5, "Parse line <$exg_anz_prz>");
-          my $posc = "$pos $poscount";
-          while (defined($self->{Portofolios}{$PFName}{$posc})) {
+          my $pos_count = "$pos $poscount";
+          while (defined($self->{Portofolios}{$PFName}{$pos_count})) {
             $poscount++;
-            $posc = "$pos $poscount";
+            $pos_count = "$pos $poscount";
           }
-          my $attrHash;
           # Belegen der Default Werte
+          my $attrHash;
           foreach (keys(%{$self->{Flags}})) {
             $attrHash->{$_} = $self->{Flags}{$_}{Default};
           }
-          my @attrArr = split('\|', $exg_anz_prz);
+          $attrHash->{Symbol}       = $pos;
+          $attrHash->{Symbol_Local} = $pos_alternativs_sort;
+
+          my @attrArr = split(/\|/, $exg_anz_prz);
           if (scalar @attrArr > 1) {
             # Alte Notation: CAD|740|10433.2|0.147|Rohstoff||
-            $attrHash->{Currency}           = $attrArr[0] || $self->{BasisCur};
+            $attrHash->{Currency}          = $attrArr[0] || $self->{BasisCur};
             if (!defined(code2currency($attrHash->{Currency}))) {
               Trace->Trc('I', 2, 0x02213, $attrHash->{Currency});
               next;
@@ -868,7 +868,7 @@ sub Positionen_parsen {
             foreach (keys(%{$dummy})) {
               $attrHash->{$_} = $dummy->{$_};
             }
-            $attrHash->{Currency}           ||= $self->{BasisCur};
+            $attrHash->{Currency}          ||= $self->{BasisCur};
             if (!defined(code2currency($attrHash->{Currency}))) {
               Trace->Trc('I', 2, 0x02213, $attrHash->{Currency});
               next;
@@ -879,16 +879,19 @@ sub Positionen_parsen {
               next;
             }
           }
-          $attrHash->{Local_Symbol}         = $lpos;
           
           # Belegen der Kurswerte
-          $self->{Kurs}{$lpos}{Symbol}           = $pos;
-          $self->{Kurs}{$lpos}{Currency}         = $attrHash->{Currency};
-          $self->{Kurs}{$lpos}{Price_Last_Trade} = $attrHash->{Price_Last_Trade};
+          foreach my $alternative (split(/\|/, $pos_alternativs)) {
+            if (!defined($self->{Kurs}{$alternative})) {
+              foreach my $attribute (keys(%{$attrHash})) {
+                $self->{Kurs}{$alternative}{$attribute} = $attrHash->{$attribute};
+              }
+            }
+          }
 
-          # Ueberschreiben mit den gelesenen Werten
+          # Uebernehmen der ermittelten Werte
           foreach (keys(%{$attrHash})) {
-            $self->{Portofolios}{$PFName}{$posc}{$_} = defined($attrHash->{$_}) ? $attrHash->{$_} : '';
+            $self->{Portofolios}{$PFName}{$pos_count}{$_} = defined($attrHash->{$_}) ? $attrHash->{$_} : '';
           }
         } ## end foreach my $exg_anz_prz (@stockattributearray)
       } ## end foreach my $pos (keys %{$PFHash...})
@@ -915,15 +918,13 @@ sub Wechselkurse_lesen {
 
   foreach (keys %{$self->{Cash}->{Bank}->{Summe}}) {
     next if ($_ eq $self->{BasisCur});
-    my $tickersymbol = $self->{BasisCur} . $_ . '=X';
-    $self->{Exchangerate}{$tickersymbol}{Symbol}   = $self->{BasisCur} . $_ . '=X';
-    $self->{Exchangerate}{$tickersymbol}{Currency} = $_;
+    $self->{Exchangerate}{$_}{Symbol} = $self->{BasisCur} . $_ . '=X';
   }
-  foreach (keys %{$self->{Kurs}}) {
-    next if ($self->{Kurs}{$_}{Currency} eq $self->{BasisCur});
-    my $tickersymbol = $self->{BasisCur} . $self->{Kurs}{$_}{Currency} . '=X';
-    $self->{Exchangerate}{$tickersymbol}{Symbol}   = $self->{BasisCur} . $self->{Kurs}{$_}{Currency} . '=X';
-    $self->{Exchangerate}{$tickersymbol}{Currency} = $self->{Kurs}{$_}{Currency};
+  foreach my $symbol (keys %{$self->{Kurs}}) {
+    foreach my $attribute ('Currency', 'Dividend_Currency') {
+      next if (defined($self->{Exchangerate}{$attribute}) || $self->{Kurs}{$symbol}{$attribute} eq $self->{BasisCur});
+      $self->{Exchangerate}{$self->{Kurs}{$symbol}{$attribute}}{Symbol} = $self->{BasisCur} . $self->{Kurs}{$symbol}{$attribute} . '=X';
+    }
   }
 
   Trace->Trc('S', 1, 0x00002, $self->{subroutine});
@@ -958,7 +959,6 @@ sub Kurse_ermitteln {
 
   # Kurs ermitteln
   # Ergebnis ist in $self->{Kurs} abgelegt
-
   # Methode Finance::Quotes
   if (defined(Configuration->config('Stockservice Finance::Quote'))) {
     $self->_webabruf_QUOTE();
@@ -976,7 +976,7 @@ sub Kurse_ermitteln {
 } ## end sub Kurse_ermitteln
 
 
-sub Kurse_ergaenzen {
+sub Kurse_umrechnen {
   #################################################################
   # Ergaenze Kursinfo durch Bereinigungen und Wechselkursumrechnung
   #
@@ -992,51 +992,111 @@ sub Kurse_ergaenzen {
 
   my $rc = 0;
 
-  foreach my $symbol (keys %{$self->{Kurs}}) {
-    my $hashptr = $self->{Kurs}{$symbol};
-
-    $$hashptr{Change} = 0           if (!defined($$hashptr{Change}));
-    $$hashptr{Price_Last_Trade} = 0 if (!defined($$hashptr{Price_Last_Trade}) || ($$hashptr{Price_Last_Trade} !~ m/^([-+]?)([0-9]*).*$/));
-    $$hashptr{Dividend} = 0         if (!defined($$hashptr{Dividend}));
-    foreach my $attribute (keys(%{$hashptr})) {
-      $$hashptr{$attribute} =~ s/^\s*|\s*$//g
-    }
-    next if ($symbol =~ /=X$/);
-    
-    my ($xsymbol, $curfaktor, $divfaktor);
-    $xsymbol   = $self->{BasisCur} . $$hashptr{Currency} . "=X";
-    $curfaktor = $self->{Exchangerate}{$xsymbol}{Rate} || 1;
-    $xsymbol   = $self->{BasisCur} . $$hashptr{Dividend_Currency} . "=X";
-    $divfaktor = $self->{Exchangerate}{$xsymbol}{Rate} || 1;
-    
-    if ($$hashptr->{Currency} ne $self->{BasisCur}) {
-      foreach my $field (keys(%{$hashptr})) {
-
-looks_like_number
-extendString
-Utils::extendString($$hashptr{$flagname}, "CUR|$curfaktor|DIV|$divfaktor");
-
-              if ($self->{Flags}{$flagname}{Faktor}) {
-                $$hashptr{$flagname . '_RAW'}  = $$hashptr{$flagname};
-                $$hashptr{$flagname}          *= $self->{Flags}{$flagname}{Faktor};
-              }
-
-
-        if (defined($$hashptr->{$field . '_RAW'})) {
-          if (my $rate = $self->{Exchangerate}{$self->{BasisCur} . $$hashptr->{Currency} . '=X'}{Rate}) {
-            Trace->Trc('I', 5, 0x02103, "$self->{BasisCur} -> $$hashptr->{Currency}", $rate);
-            $self->{Kurs}{$symbol}{$field . '_RAW'} = $self->{Kurs}{$symbol}{$field} * $self->{Kurs}{$xsymbol}{last}
+  # Umrechnen aller Portofolio Positionen
+  foreach my $PFName (keys(%{$self->{Portofolios}})) {
+    foreach my $pos (keys %{$self->{Portofolios}{$PFName}}) {
+      if ($self->{Portofolios}{$PFName}{$pos}{Currency} ne $self->{BasisCur}) {
+        # Gekauft in einer anderen Waehrunge als jetzt dargestellt
+        foreach my $attribute ('Price_Buy_Pos') {
+          if ($self->{Portofolios}{$PFName}{$pos}{$attribute}) {
+            $self->{Portofolios}{$PFName}{$pos}{$attribute} *= $self->{Exchangerate}{$self->{Portofolios}{$PFName}{$pos}{Currency}}{Rate};
           }
+        }
+        $self->{Portofolios}{$PFName}{$pos}{Currency} = $self->{BasisCur};
+      }
+      if ($self->{Portofolios}{$PFName}{$pos}{Dividend_Currency} ne $self->{BasisCur}) {
+        foreach my $attribute ('Dividend') {
+          if ($self->{Portofolios}{$PFName}{$pos}{$attribute}) {
+            $self->{Portofolios}{$PFName}{$pos}{$attribute} *= $self->{Exchangerate}{$self->{Portofolios}{$PFName}{$pos}{Dividend_Currency}}{Rate};
+          }
+        }
+        $self->{Portofolios}{$PFName}{$pos}{Dividend_Currency} = $self->{BasisCur};
+      }
+
+      # Faktorisieren der Felder falls konfiguriert
+      foreach my $attribute (keys(%{$self->{Portofolios}{$PFName}{$pos}})) {
+        if ($self->{Flags}{$attribute}{Faktor}) {
+          $self->{Portofolios}{$PFName}{$pos}{$attribute} *= $self->{Flags}{$attribute}{Faktor};
+        }
+      }
+    }
+  }
+  
+  # Umrechnen aller Kurs Positionen
+  foreach my $pos (keys(%{$self->{Kurs}})) {
+    if ($self->{Kurs}{$pos}{Currency} ne $self->{BasisCur}) {
+      foreach my $attribute ('Change', 'Change_Day', 'Price_Last_Trade') {
+        if ($self->{Kurs}{$pos}{$attribute}) {
+          $self->{Kurs}{$pos}{$attribute} *= $self->{Exchangerate}{$self->{Kurs}{$pos}{Currency}}{Rate};
+        }
+      }
+      $self->{Kurs}{$pos}{Currency} = $self->{BasisCur};
+    }
+    if ($self->{Kurs}{$pos}{Dividend_Currency} ne $self->{BasisCur}) {
+      foreach my $attribute ('Dividend') {
+        if ($self->{Kurs}{$pos}{$attribute}) {
+          $self->{Kurs}{$pos}{$attribute} *= $self->{Exchangerate}{$self->{Kurs}{$pos}{Dividend_Currency}}{Rate};
+        }
+      }
+      $self->{Kurs}{$pos}{Dividend_Currency} = $self->{BasisCur};
+    }
+    
+    # Faktorisieren der Kurse falls konfiguriert
+    foreach my $attribute (keys(%{$self->{Kurs}{$pos}})) {
+      if ($self->{Flags}{$attribute}{Faktor}) {
+        $self->{Kurs}{$pos}{$attribute} *= $self->{Flags}{$attribute}{Faktor};
+      }
+    } 
+  }
+  
+  # Umrechnen aller Cash Positionen
+  foreach my $owner (keys(%{$self->{Cash}})) {
+    foreach my $bank (keys %{$self->{Cash}{$owner}}) {
+      foreach my $cur (keys %{$self->{Cash}{$owner}{$bank}}) {
+        next if $cur eq $self->{BasisCur};
+        $self->{Cash}{$owner}{$bank}{$cur} *= $self->{Exchangerate}{$cur}{Rate};
+      }
+    }
+  }
+
+  # Ab hier ist alles in Basiswaehrung umgerechnet
+
+  Trace->Trc('S', 1, 0x00002, $self->{subroutine});
+  $self->{subroutine} = $merker;
+
+  return $rc;
+} ## end sub Kurse_ergaenzen
 
 
-          my $xsymbol = $self->{BasisCur} . $$hashptr->{Currency} . '=X';
-          if ($self->{Kurs}{$xsymbol}{last}) {
-            Trace->Trc('I', 5, 0x02103, $xsymbol, $self->{Kurs}{$xsymbol}{last});
-            $self->{Kurs}{$symbol}{$field . '_RAW'} = $self->{Kurs}{$symbol}{$field} * $self->{Kurs}{$xsymbol}{last}
+sub Portofolios_summieren {
+  #################################################################
+  # Summiert identische Einzelpositionen auf
+  #
+  
+  my $self = shift;
+
+  my $merker = $self->{subroutine};
+  $self->{subroutine} = (caller(0))[3];
+  Trace->Trc('S', 1, 0x00001, $self->{subroutine}, $self->{Eingabedatei});
+
+  my $rc = 0;
+
+  # Umrechnen aller Portofolio Positionen
+  foreach my $PFName (keys(%{$self->{Portofolios}})) {
+    my %PFHash;
+    foreach my $pos (keys %{$self->{Portofolios}{$PFName}}) {
+      my ($symbol, $count) = split(/ /, $pos);
+      if (!defined($PFHash{"$symbol 1"})) {
+        $PFHash{"$symbol 1"} = $self->{Portofolios}{$PFName}{$pos};
+      } else {
+        foreach my $attribute (keys %{$self->{Portofolios}{$PFName}{$pos}}) {
+          if (($attribute eq 'Quantity') || ($attribute =~ /_Pos$/)) {
+            $PFHash{"$symbol 1"}{$attribute} += $self->{Portofolios}{$PFName}{$pos}{$attribute};
           }
         }
       }
     }
+    $self->{Portofolios}{$PFName} = \%PFHash; 
   }
 
   Trace->Trc('S', 1, 0x00002, $self->{subroutine});
@@ -1166,12 +1226,12 @@ sub Portofolios_analysieren {
   my $rc = 0;
 
           
-#          if (looks_like_number($self->{Portofolios}{$PFName}{$posc}{Quantity}) && $self->{Portofolios}{$PFName}{$posc}{Quantity} && 
-#              looks_like_number($self->{Portofolios}{$PFName}{$posc}{Price_Buy_Pos})) {
-#            $self->{Portofolios}{$PFName}{$posc}{Price_Buy} = $self->{Portofolios}{$PFName}{$posc}{Price_Buy_Pos} / $self->{Portofolios}{$PFName}{$posc}{Quantity};
+#          if (looks_like_number($self->{Portofolios}{$PFName}{$pos_count}{Quantity}) && $self->{Portofolios}{$PFName}{$pos_count}{Quantity} && 
+#              looks_like_number($self->{Portofolios}{$PFName}{$pos_count}{Price_Buy_Pos})) {
+#            $self->{Portofolios}{$PFName}{$pos_count}{Price_Buy} = $self->{Portofolios}{$PFName}{$pos_count}{Price_Buy_Pos} / $self->{Portofolios}{$PFName}{$pos_count}{Quantity};
 #          } else {
-#            Trace->Trc('I', 2, 0x0220f, $PFName, $posc, $self->{Portofolios}{$PFName}{$posc}{Quantity}, looks_like_number($self->{Portofolios}{$PFName}{$posc}{Quantity}), $self->{Portofolios}{$PFName}{$posc}{Price_Buy_Pos}, looks_like_number($self->{Portofolios}{$PFName}{$posc}{Price_Buy_Pos}));
-#            $self->{Portofolios}{$PFName}{$posc}{Price_Buy} = '0';
+#            Trace->Trc('I', 2, 0x0220f, $PFName, $pos_count, $self->{Portofolios}{$PFName}{$pos_count}{Quantity}, looks_like_number($self->{Portofolios}{$PFName}{$pos_count}{Quantity}), $self->{Portofolios}{$PFName}{$pos_count}{Price_Buy_Pos}, looks_like_number($self->{Portofolios}{$PFName}{$pos_count}{Price_Buy_Pos}));
+#            $self->{Portofolios}{$PFName}{$pos_count}{Price_Buy} = '0';
 #          }
 
   POSIX::setlocale(&POSIX::LC_ALL, 'de_DE');

@@ -104,6 +104,25 @@ if ($@) {
 
 #-------------------------------------------------------------------------------
 # PRGRAMM-Start
+# 1.) Beim Parsen der Portofolios BKN.DE|BNS|BNS.TO splitten nach "|", sortier-
+#     en vom ersten Wert Alles vor dem Komma als Symbol verwenden.
+#     Der Key ist "BKN 1".
+#     Im Inhalt ist ein Feld Symbol_Local mit "BKN.DE|BNS|BNS.TO"
+# 2.) Für alle gefundenen lokalen Symbole einen Kurseintrag anlegen mit dem
+#     lokalen Symbol als key.
+#       {BKN.DE}
+#       {BNS.TO}
+#       {BNS}
+# 3.) Für alle Kurse die Werte holen
+# 4.) Für alle Portofoliopositionen den enstprechenden Kurs Eintrag suchen
+#       - Key des Kurses ist ein Symbol_lokal der Portofolioposition
+#       - Währung is identisch
+# 5.) Falls es Im Kurs Dividende und Dividenden Währung gibt, übernehmen
+#     und Werte aus Portofolio überschreiben
+# 6.) Alle Positionen umrechnen in die Basiswährung
+# 7.) Ggf. aufsummieren und ausgeben
+#        
+#     
 #-------------------------------------------------------------------------------
 $prg->Flags_laden();
 $prg->Portofolios_lesen(CmdLine->argument());
@@ -115,7 +134,8 @@ $prg->Positionen_parsen();
 $prg->Wechselkurse_lesen();
 $prg->Kurse_ermitteln();
 
-$prg->Kurse_ergaenzen();
+$prg->Kurse_umrechnen();
+$prg->Portofolios_summieren() if ($prg->{SumPos});
 $prg->Portofolios_analysieren();
 $prg->Ausgabe_schreiben();
 
