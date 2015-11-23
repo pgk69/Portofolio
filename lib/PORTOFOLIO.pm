@@ -308,18 +308,18 @@ sub _webabruf_YAHOO {
   
   foreach (sort keys %{$self->{Kurs}}) {
     my @symbols = split('\|', $_);
-    my $hashptr = $self->{Kurs}{$_};
-    while ((my $symbol = shift(@symbols)) && !($$hashptr{last})) {
+    my $kursptr = $self->{Kurs}{$_};
+    while ((my $symbol = shift(@symbols)) && !($$kursptr{last})) {
       # Fuer jedes Symbol den Abruf machen sofern noch kein Kurs feststeht
       Trace->Trc('I', 2, 0x02104, $symbol);
-      if (!$$hashptr{_aktuell} && (!$$hashptr{_letzter_Abruf} || ($$hashptr{_letzter_Abruf} < time - $self->{MaxDelay}))) {
+      if (!$$kursptr{_aktuell} && (!$$kursptr{_letzter_Abruf} || ($$kursptr{_letzter_Abruf} < time - $self->{MaxDelay}))) {
         my $webAbruf = Utils::extendString(Configuration->config('Stockservice Yahoo', 'URL'), 'STOCK|' . $symbol . '|DATA|' . join('', @flags));
         my $maxtry = Configuration->config('Stockservice Yahoo', 'Anzahl_Versuche') || 10;
 
         my $crlfmerker = $/;
         $/ = '%';
 
-        $$hashptr{_aktuell} = 0;
+        $$kursptr{_aktuell} = 0;
         do {
           my $stockdata = get($webAbruf);
           if (defined($stockdata) && $stockdata !~ 'Missing') {
@@ -333,31 +333,31 @@ sub _webabruf_YAHOO {
               if (defined($flag) && $flag ne '-') {
                 # Sichern des Originalwertes
                 if ($self->{Flags}{$flagname}{Faktor}) {
-                  $$hashptr{$flagname . '_RAW'} = $wert
+                  $$kursptr{$flagname . '_RAW'} = $wert
                 }
-                if ($self->{Flags}{$flagname}{Faktor} && $$hashptr{_Waehrung}) {
+                if ($self->{Flags}{$flagname}{Faktor} && $$kursptr{_Waehrung}) {
                   if ($self->{Flags}{$flagname}{Faktor} == 1) {
-                    my $curxchg = $self->{BasisCur} . $$hashptr{_Waehrung} . '=X';
+                    my $curxchg = $self->{BasisCur} . $$kursptr{_Waehrung} . '=X';
                     # Falls der Wechselkurs fuer die Waehrung noch nicht ermittelt ist,
                     # versuchen wir das
                     if (!$self->{Kurs}{$curxchg}{last}) {
                       # Default -> Wechselkurs 1
                       $self->{Kurs}{$curxchg}{last} = 1;
-                      if ($$hashptr{_Waehrung} ne $self->{BasisCur}) {
-                        if ($$hashptr{_Waehrung} =~ /^[0-9.,]+/) {
+                      if ($$kursptr{_Waehrung} ne $self->{BasisCur}) {
+                        if ($$kursptr{_Waehrung} =~ /^[0-9.,]+/) {
                           # Keine Standardwaehrung -> Wechselkurs wird direkt angegeben
-                          $self->{Kurs}{$curxchg}{last} = $$hashptr{_Waehrung};
-                        } elsif ($$hashptr{_Waehrung} =~ /^[A-Za-z][A-Za-z0-9]{2}/) {
+                          $self->{Kurs}{$curxchg}{last} = $$kursptr{_Waehrung};
+                        } elsif ($$kursptr{_Waehrung} =~ /^[A-Za-z][A-Za-z0-9]{2}/) {
                           # Standardwaehrung -> Wechselkurs wird ermittelt
                           $self->_webabruf_YAHOO($curxchg, $self->{Kurs}{$curxchg});
                           # Normalisieren des Wertes
                           $self->{Kurs}{$curxchg}{last} *= 1;
                           # Fuer GBP ist ein weiterer Faktor 100 noetig
-                          $self->{Kurs}{$curxchg}{last} *= 100 if ($$hashptr{_Waehrung} eq 'GBP');
+                          $self->{Kurs}{$curxchg}{last} *= 100 if ($$kursptr{_Waehrung} eq 'GBP');
                         }
-                      } ## end if ($$hashptr{_Waehrung...})
+                      } ## end if ($$kursptr{_Waehrung...})
                     } ## end if (!$self->{Kurs}{$curxchg...})
-                    $self->{Exchange}{$$hashptr{_Waehrung}} = $self->{Kurs}{$curxchg}{last};
+                    $self->{Exchange}{$$kursptr{_Waehrung}} = $self->{Kurs}{$curxchg}{last};
 
                     # Der Wert in Basiswaehrung wird nur ermittelt, falls ein Wechselkurs existiert
                     $wert = $wert / $self->{Kurs}{$curxchg}{last} if ($self->{Kurs}{$curxchg}{last});
@@ -366,44 +366,44 @@ sub _webabruf_YAHOO {
                   }
                 } ## end if ($self->{Flags}{$flag...})
                 # Sichern des faktorisierten Wertes
-                $$hashptr{$flagname} = ($flagname ne 'symbol') ? $wert : (split(/\./, $wert))[0];
+                $$kursptr{$flagname} = ($flagname ne 'symbol') ? $wert : (split(/\./, $wert))[0];
               } ## end if (defined($flag))
             } ## end while ($stockdata =~ /\"[\s0]*([^\"]+?)[\s]*\"|[\s0]*([^,\s]+)/g)
           } ## end if (defined($stockdata...))
           $maxtry--;
         }
-        until ($maxtry <= 0 || ($$hashptr{last} &&
-                                $$hashptr{last} ne 'N/A' &&
-                                $$hashptr{last} > 0 &&
-                                $$hashptr{last} <= 1000000 &&
-                                $$hashptr{last} != 1));
+        until ($maxtry <= 0 || ($$kursptr{last} &&
+                                $$kursptr{last} ne 'N/A' &&
+                                $$kursptr{last} > 0 &&
+                                $$kursptr{last} <= 1000000 &&
+                                $$kursptr{last} != 1));
 
-        if ($$hashptr{date} && $$hashptr{'time'}) {
-          $$hashptr{Timestamp} = str2time("$$hashptr{date} $$hashptr{'time'}", $self->{TZ}) || 0;
-          $$hashptr{Tradetime} = time2str('%d.%m.%y %R', $$hashptr{Timestamp});
-          $$hashptr{_lastTrade} = abs((str2time(time2str('%x', time)) - str2time(time2str('%x', $$hashptr{Timestamp}))) / 86400);
-          if ($$hashptr{Timestamp} < str2time(time2str('%x', time))) {
-            # $$hashptr{Tradetime} .= '<';
-            $$hashptr{_aktuell} = ($$hashptr{_letzter_Abruf} && $$hashptr{_letzter_Abruf} < time - $self->{MaxDelay}) ? 0 : 1;
+        if ($$kursptr{date} && $$kursptr{'time'}) {
+          $$kursptr{Last_Trade_TS} = str2time("$$kursptr{date} $$kursptr{'time'}", $self->{TZ}) || 0;
+          $$kursptr{Last_Trade}    = time2str('%d.%m.%y %R', $$kursptr{Last_Trade_TS});
+          $$kursptr{_lastTrade}    = abs((str2time(time2str('%x', time)) - str2time(time2str('%x', $$kursptr{Last_Trade_TS}))) / 86400);
+          if ($$kursptr{Last_Trade_TS} < str2time(time2str('%x', time))) {
+            # $$kursptr{Last_Trade} .= '<';
+            $$kursptr{_aktuell} = ($$kursptr{_letzter_Abruf} && $$kursptr{_letzter_Abruf} < time - $self->{MaxDelay}) ? 0 : 1;
           } else {
-            $$hashptr{_aktuell} = 1
+            $$kursptr{_aktuell} = 1
           }
-          $$hashptr{_letzter_Abruf} = time;
+          $$kursptr{_letzter_Abruf} = time;
         } else {
-          $$hashptr{Tradetime} = 0
+          $$kursptr{Last_Trade} = 0
         }
 
-        if ($$hashptr{name}) {
-          $$hashptr{name} =~ s/\s+N$//
+        if ($$kursptr{name}) {
+          $$kursptr{name} =~ s/\s+N$//
         }
 
-        Trace->Trc('I', 2, 0x02102, $symbol, $$hashptr{name}, $$hashptr{last});
+        Trace->Trc('I', 2, 0x02102, $symbol, $$kursptr{name}, $$kursptr{last});
 
         $/ = $crlfmerker;
-      } ## end if (!$$hashptr{_aktuell...})
+      } ## end if (!$$kursptr{_aktuell...})
 
-      if ($$hashptr{_last}) {
-        $$hashptr{last} = $$hashptr{_last}
+      if ($$kursptr{_last}) {
+        $$kursptr{last} = $$kursptr{_last}
       }
 
       # Kursinfos speichern
@@ -440,7 +440,7 @@ sub _webabruf_QUOTE {
   # Wechselkurse ermitteln
   foreach (keys(%{$self->{Exchangerate}})) {
     $self->{Exchangerate}{$_}{Rate}         = $quoter->currency($_, $self->{BasisCur});
-    $self->{Exchangerate}{$_}{Reverse_Rate} = 1/$self->{Exchangerate}{$_}{Rate};
+    $self->{Exchangerate}{$_}{Reverse_Rate} = $self->{Exchangerate}{$_}{Rate} ? 1/$self->{Exchangerate}{$_}{Rate} : undef;
   }
       
   # Array ueber alle Symbole erstellen
@@ -464,8 +464,8 @@ sub _webabruf_QUOTE {
       foreach my $symbol (@symbols) {
         next if !$info{$symbol,"success"};       # Skip failures.
         next if $info{$symbol,"last"} eq '0,00'; # Skip failures.
-        my $hashptr = $self->{Kurs}{$symbol};
-        my %value;
+        my $kursptr = $self->{Kurs}{$symbol};
+        my %posval;
         foreach (keys %{$self->{Flags}}) {
           # Ergebnisse auswerten
           my $infoval = $self->{Flags}{$_}{Quote} ? $info{$symbol, $self->{Flags}{$_}{Quote}} : undef;
@@ -475,41 +475,41 @@ sub _webabruf_QUOTE {
           if (defined($infoval) && $self->{Flags}{$_}{Laenge}) {
             $infoval = substr($infoval, 0, $self->{Flags}{$_}{Laenge})
           }
-          $value{$_} = $infoval;
-          Trace->Trc('I', 2, 0x02102, $symbol, $_, $value{$_});
+          $posval{$_} = $infoval;
+          Trace->Trc('I', 2, 0x02102, $symbol, $_, $posval{$_});
         }
         
         # $self->{Kurs} aktualisieren, falls das Ergebnis neuer ist
-        $value{Timestamp} = 0;
-        if ($value{Last_Trade_Date} && $value{Last_Trade_Time}) {
-          $value{Timestamp} = str2time("$value{Last_Trade_Date} $value{Last_Trade_Time}") || 0
+        $posval{Last_Trade_TS} = 0;
+        if ($posval{Last_Trade_Date} && $posval{Last_Trade_Time}) {
+          $posval{Last_Trade_TS} = str2time("$posval{Last_Trade_Date} $posval{Last_Trade_Time}") || 0
         }
         
-        if (!defined($$hashptr{Timestamp}) || ($value{Timestamp} > $$hashptr{Timestamp})) {
-          $$hashptr{aktuell} = 0;
+        if (!defined($$kursptr{Last_Trade_TS}) || ($posval{Last_Trade_TS} > $$kursptr{Last_Trade_TS})) {
+          $$kursptr{aktuell} = 0;
       
-          foreach my $flagname (keys(%value)) {
+          foreach my $flagname (keys(%posval)) {
             if ($flagname eq 'Symbol') {
-              $$hashptr{$flagname} = (split(/\./, $value{$flagname}))[0];
+              $$kursptr{$flagname} = (split(/\./, $posval{$flagname}))[0];
             } else {
-              $$hashptr{$flagname} = $value{$flagname};
+              $$kursptr{$flagname} = $posval{$flagname};
             }
           }
       
-          if ($value{Timestamp}) {
-            $$hashptr{Tradetime} = time2str('%d.%m.%y %R', $$hashptr{Timestamp} + $self->{UTCDelta});
-            $$hashptr{Last_Trade} = abs((str2time(time2str('%x', time)) - str2time(time2str('%x', $value{Timestamp}))) / 86400);
-            $$hashptr{aktuell} = 1;
-            $$hashptr{letzter_Abruf} = str2time(gmtime());
+          if ($posval{Last_Trade_TS}) {
+            $$kursptr{Last_Trade} = time2str('%d.%m.%y %R', $$kursptr{Last_Trade_TS} + $self->{UTCDelta});
+            $$kursptr{Last_Trade_Days_ago} = abs((str2time(time2str('%x', time)) - str2time(time2str('%x', $posval{Last_Trade_TS}))) / 86400);
+            $$kursptr{aktuell} = 1;
+            $$kursptr{letzter_Abruf} = str2time(gmtime());
           } else {
-            $$hashptr{Tradetime} = 0
+            $$kursptr{Last_Trade} = 0
           }
       
-          if ($$hashptr{Name}) {$$hashptr{Name} =~ s/\s+N$//}
-          if (!defined($$hashptr{Symbol}) || ($$hashptr{Symbol} eq '')) {$$hashptr{Symbol} = $symbol}
-          if (!defined($$hashptr{Stock_Exchange}) || ($$hashptr{Stock_Exchange} eq '')) {$$hashptr{Stock_Exchange} = $quelle}
+          if ($$kursptr{Name}) {$$kursptr{Name} =~ s/\s+N$//}
+          if (!defined($$kursptr{Symbol}) || ($$kursptr{Symbol} eq '')) {$$kursptr{Symbol} = $symbol}
+          if (!defined($$kursptr{Stock_Exchange}) || ($$kursptr{Stock_Exchange} eq '')) {$$kursptr{Stock_Exchange} = $quelle}
         }
-        Trace->Trc('I', 2, 0x02102, $symbol, $$hashptr{Name}, $$hashptr{Last_Trade});
+        Trace->Trc('I', 2, 0x02102, $symbol, $$kursptr{Name}, $$kursptr{Last_Trade_Days_ago});
       }
     }
   }
@@ -861,7 +861,7 @@ sub Positionen_parsen {
             $attrHash->{Price_Buy_Pos}     = $attrArr[2];
             $attrHash->{Dividend}          = $attrArr[3] || '0';
             $attrHash->{Branche}           = $attrArr[4] || '';
-            $attrHash->{Price_Last_Trade}  = (defined($attrArr[5]) && $attrArr[5] =~ m/^([-+]?)([0-9]*).*$/) ? $attrArr[5] : 0;
+            $attrHash->{Price}             = (defined($attrArr[5]) && $attrArr[5] =~ m/^([-+]?)([0-9]*).*$/) ? $attrArr[5] : 0;
           } else {
             # Neue JSON Notation: {Currency:"CAD", Quantity:740, Price_Buy_Pos:10433.2, Dividend:0.147, Branche:"Rohstoff", WKN:1234567,  Name:"Willi was here"}
             my $dummy = decode_json $exg_anz_prz;
@@ -999,7 +999,9 @@ sub Kurse_umrechnen {
         # Gekauft in einer anderen Waehrunge als jetzt dargestellt
         foreach my $attribute ('Price_Buy_Pos') {
           if ($self->{Portofolios}{$PFName}{$pos}{$attribute}) {
-            $self->{Portofolios}{$PFName}{$pos}{$attribute} *= $self->{Exchangerate}{$self->{Portofolios}{$PFName}{$pos}{Currency}}{Rate};
+            if (my $rate = $self->{Exchangerate}{$self->{Portofolios}{$PFName}{$pos}{Currency}}{Rate}) {
+              $self->{Portofolios}{$PFName}{$pos}{$attribute} *= $rate;
+            }
           }
         }
         $self->{Portofolios}{$PFName}{$pos}{Currency} = $self->{BasisCur};
@@ -1007,7 +1009,9 @@ sub Kurse_umrechnen {
       if ($self->{Portofolios}{$PFName}{$pos}{Dividend_Currency} ne $self->{BasisCur}) {
         foreach my $attribute ('Dividend') {
           if ($self->{Portofolios}{$PFName}{$pos}{$attribute}) {
-            $self->{Portofolios}{$PFName}{$pos}{$attribute} *= $self->{Exchangerate}{$self->{Portofolios}{$PFName}{$pos}{Dividend_Currency}}{Rate};
+            if (my $rate = $self->{Exchangerate}{$self->{Portofolios}{$PFName}{$pos}{Dividend_Currency}}{Rate}) {
+              $self->{Portofolios}{$PFName}{$pos}{$attribute} *= $rate;
+            }
           }
         }
         $self->{Portofolios}{$PFName}{$pos}{Dividend_Currency} = $self->{BasisCur};
@@ -1035,7 +1039,9 @@ sub Kurse_umrechnen {
     if ($self->{Kurs}{$pos}{Dividend_Currency} ne $self->{BasisCur}) {
       foreach my $attribute ('Dividend') {
         if ($self->{Kurs}{$pos}{$attribute}) {
-          $self->{Kurs}{$pos}{$attribute} *= $self->{Exchangerate}{$self->{Kurs}{$pos}{Dividend_Currency}}{Rate};
+          if (my $rate = $self->{Exchangerate}{$self->{Kurs}{$pos}{Dividend_Currency}}{Rate}) {
+            $self->{Kurs}{$pos}{$attribute} *= $rate;
+          }
         }
       }
       $self->{Kurs}{$pos}{Dividend_Currency} = $self->{BasisCur};
@@ -1054,7 +1060,9 @@ sub Kurse_umrechnen {
     foreach my $bank (keys %{$self->{Cash}{$owner}}) {
       foreach my $cur (keys %{$self->{Cash}{$owner}{$bank}}) {
         next if $cur eq $self->{BasisCur};
-        $self->{Cash}{$owner}{$bank}{$cur} *= $self->{Exchangerate}{$cur}{Rate};
+        if (my $rate = $self->{Exchangerate}{$cur}{Rate}) {
+          $self->{Cash}{$owner}{$bank}{$cur} *= $rate;
+        }
       }
     }
   }
@@ -1070,9 +1078,41 @@ sub Kurse_umrechnen {
 
 sub Portofolios_summieren {
   #################################################################
-  # Summiert identische Einzelpositionen auf
-  #
-  
+  # Summiert identische Einzelpositionen auf und ergaenzt die Werte
+  # (verfuegbar bei: P-Portofolio, W-Watchlist, S-Summe)
+  # PW  Name                : Name der Position
+  # PW  WKN                 : WKN der Position
+  # PW  Symbol              : Kurzsymbol der Position
+  # PW  Symbol_Local        : Symbol der Position mit Handalsplatz
+  # PW  Branche             : Branche
+  # PW  Quantity            : Amount of Shares in Position
+  # PW  Price               : Aktueller Preis per Share
+  # PW  Price_Pos           : Aktueller Preis der Position
+  # PW  Price_Last          : Letzter Preis per Share
+  # PWS Price_Last_Pos      : Letzter Preis der Position
+  # PW  Price_Buy           : Kaufpreis per Share
+  # PWS Price_Buy_Pos       : Kaufpreis der Position
+  # PW  Change              : Absolute Veraenderung per Share seit Kauf
+  # PWS Change_Pos          : Absolute Veraenderung der Position seit Kauf
+  # PW  Change_Percent      : Prozentuale Veraenderung seit Kauf
+  # PW  Change_Day          : Absolute Veraenderung per Share am aktuellen Tag
+  # PWS Change_Day_Pos      : Absolute Veraenderung der Position am aktuellen Tag
+  # PW  Change_Day_Percent  : Prozentuale Veraenderung am aktuellen Tag
+  # PW  Currency            : Waehrung der Position
+  # PW  Dividend            : Dividende per Share
+  # PWS Dividend_Pos        : Absolute Dividende in Position
+  # PW  Dividend_Date       : Datum der Dividendenausschuettung
+  # PW  Dividend_Yield      : Prozentuale Dividende bezogen auf den aktuellen Wert
+  # PW  Dividend_Currency   : Waehrung der Dividendenausschuettung
+  # PW  Last_Trade          : Zeitpunkt des letzter Handels
+  # PW  Last_Trade_Date     : Datum des letzter Handels
+  # PW  Last_Trade_Time     : Uhrzeit des letzter Handels
+  # PW  Last_Trade_TS       : Timestamp des letzter Handels
+  # PW  Last_Trade_Days_ago : Wieviele Tage liegt der letzte Handel zurück
+  # PW  letzter_Abruf       : Timestamp der letzten Kursermittelung
+  # PW  Stock_Exchange      : Handelsplatz
+  # PW  aktuell             : Flag, das anzeigt, ob der Kurs aktuell ist
+
   my $self = shift;
 
   my $merker = $self->{subroutine};
@@ -1081,102 +1121,103 @@ sub Portofolios_summieren {
 
   my $rc = 0;
 
-  # Umrechnen aller Portofolio Positionen
+  POSIX::setlocale(&POSIX::LC_ALL, 'de_DE');
+
+  $self->{Portofolios}{Summe} = {};
   foreach my $PFName (keys(%{$self->{Portofolios}})) {
-    my %PFHash;
-    foreach my $pos (keys %{$self->{Portofolios}{$PFName}}) {
-      my ($symbol, $count) = split(/ /, $pos);
-      if (!defined($PFHash{"$symbol 1"})) {
-        $PFHash{"$symbol 1"} = $self->{Portofolios}{$PFName}{$pos};
-      } else {
-        foreach my $attribute (keys %{$self->{Portofolios}{$PFName}{$pos}}) {
-          if (($attribute eq 'Quantity') || ($attribute =~ /_Pos$/)) {
-            $PFHash{"$symbol 1"}{$attribute} += $self->{Portofolios}{$PFName}{$pos}{$attribute};
+    if ($PFName ne 'Summe') {
+      if ($self->{SumPos}) {
+        my %PFHash;
+        foreach my $pos (keys %{$self->{Portofolios}{$PFName}}) {
+          my ($symbol, $count) = split(/ /, $pos);
+          if ($symbol) {
+            # Aufsummieren aller Einzelpositionen in eine Position
+            if (!defined($PFHash{"$symbol 1"})) {
+              $PFHash{"$symbol 1"} = $self->{Portofolios}{$PFName}{$pos};
+            } else {
+              foreach my $attribute (keys %{$self->{Portofolios}{$PFName}{$pos}}) {
+                if (($attribute eq 'Quantity') || ($attribute =~ /_Pos$/)) {
+                  $PFHash{"$symbol 1"}{$attribute} += $self->{Portofolios}{$PFName}{$pos}{$attribute};
+                }
+              }
+            }
           }
         }
+        $self->{Portofolios}{$PFName} = \%PFHash;
+      } 
+
+      foreach my $pos (keys %{$self->{Portofolios}{$PFName}}) {
+        # Aufsummieren aller Depotwerte in eine Depotsummenposition
+        my $posptr  = $self->{Portofolios}{$PFName}{$pos};
+        my @symbols = split(/\|/, $posptr->{Symbol_Local});
+        # Todo: den passenden Eintrag aus Kurs ermitteln
+        my %kurs;
+        foreach (@symbols) {
+          next if %kurs;
+          if ($self->{Kurs}{$_}{aktuell}) {
+            %kurs = %{$self->{Kurs}{$_}};
+          }
+        }
+        
+        # Ergaenzen der Positionsinfos
+        if (looks_like_number($posptr->{Quantity}) && $posptr->{Quantity} && looks_like_number($posptr->{Price_Buy_Pos})) {
+          $posptr->{Price_Buy} = $posptr->{Price_Buy_Pos} / $posptr->{Quantity};
+        } else {
+          Trace->Trc('I', 2, 0x0220f, $PFName, $pos, $posptr->{Quantity}, looks_like_number($posptr->{Quantity}), $posptr->{Price_Buy_Pos}, looks_like_number($posptr->{Price_Buy_Pos}));
+          $posptr->{Price_Buy} = '0';
+        }
+        $posptr->{Price}               = $kurs{Price} ? $kurs{Price} : $posptr->{Price_Buy};
+        $posptr->{Price_Pos}           = $posptr->{Quantity} * $posptr->{Price};
+        $posptr->{Change}              = $posptr->{Price} - $posptr->{Price_Buy};
+        $posptr->{Change_Pos}          = $posptr->{Price_Pos} - $posptr->{Price_Buy_Pos};
+        $posptr->{Change_Percent}      = $posptr->{Price_Buy_Pos} ? 100 * $posptr->{Change_Pos} / $posptr->{Price_Buy_Pos} : 0;
+        $posptr->{Change_Day}          = $kurs{Change_Day} ? $kurs{Change_Day} : 0;
+        $posptr->{Change_Day_Pos}      = $kurs{Change_Day} ? $posptr->{Quantity} * $kurs{Change_Day} : 0;
+        $posptr->{Change_Day_Percent}  = $kurs{Change_Day_Percent} ? $kurs{Change_Day_Percent} : 0;
+        $posptr->{Change_Day_Percent}  =~ s/%$// if (defined($posptr->{Change_Day_Percent}));
+        $posptr->{Price_Last}          = $posptr->{Price} - $posptr->{Change_Day};
+        $posptr->{Price_Last_Pos}      = $posptr->{Price_Pos} - $posptr->{Change_Day_Pos};
+        $posptr->{Last_Trade_Days_ago} = defined($kurs{Last_Trade_Days_ago}) ? $kurs{Last_Trade_Days_ago} : '';
+        $posptr->{Last_Trade_Date}     = defined($kurs{Last_Trade_Date}) ? $kurs{Last_Trade_Date} : '';
+        $posptr->{Last_Trade_Time}     = defined($kurs{Last_Trade_Time}) ? $kurs{Last_Trade_Time} : '';
+        $posptr->{Last_Trade}          = defined($kurs{Last_Trade}) ? $kurs{Last_Trade} : '';
+        $posptr->{Last_Trade_TS}       = defined($kurs{Last_Trade_TS}) ? $kurs{Last_Trade_TS} : '';
+
+        $posptr->{letzter_Abruf}       = defined($kurs{letzter_Abruf}) ? $kurs{letzter_Abruf} : '';
+        $posptr->{aktuell}             = defined($kurs{aktuell}) ? $kurs{aktuell} : 0;
+
+        $posptr->{Stock_Exchange}      = defined($kurs{Stock_Exchange}) ? $kurs{Stock_Exchange} : '';
+    
+        # Dividendeninfos falls vorhanden aus Kurs holen andernfalls aus ini
+        $posptr->{Dividend}            = $kurs{Dividend} if defined($kurs{Dividend});
+        $posptr->{Dividend_Pos}        = $posptr->{Quantity} * $posptr->{Dividend};
+        $posptr->{Dividend_Yield}      = defined($kurs{Dividend_Yield}) ? $kurs{Dividend_Yield} : $posptr->{Price} ? 100 * $posptr->{Dividend} / $posptr->{Price} : 0;
+        $posptr->{Dividend_Date}       = defined($kurs{Dividend_Date}) ? $kurs{Dividend_Date} : '';
+        
+        # Aufsummieren der Werte fuer die Gesamtsumme
+        $self->{Portofolios}{Summe}{$PFName}{Price_Buy_Pos}  += $posptr->{Price_Buy_Pos};
+        $self->{Portofolios}{Summe}{$PFName}{Price_Last_Pos} += $posptr->{Price_Last_Pos};
+        $self->{Portofolios}{Summe}{$PFName}{Price_Pos}      += $posptr->{Price_Pos};
+        $self->{Portofolios}{Summe}{$PFName}{Change_Day_Pos} += $posptr->{Change_Day_Pos};
+        $self->{Portofolios}{Summe}{$PFName}{Change_Pos}     += $posptr->{Change_Pos};
+        $self->{Portofolios}{Summe}{$PFName}{Dividend_Pos}   += $posptr->{Dividend_Pos} ;
       }
     }
-    $self->{Portofolios}{$PFName} = \%PFHash; 
   }
 
   Trace->Trc('S', 1, 0x00002, $self->{subroutine});
   $self->{subroutine} = $merker;
 
   return $rc;
-} ## end sub Kurse_ergaenzen
-
-
-sub _calculate {
-  my $self = shift;
-  
-  my $depot = shift;
-
-  # Falls es wir ein echtes Depot bearbeiten
-  foreach my $pos (keys %{$self->{Portofolios}{$depot}}) {
-    if (my $symbol = (split(' ', $pos))[0]) {
-      # Falls es eine Position gibt
-      $self->{Portofolios}{$depot}{$pos}{Price_Share}        = $self->{Kurs}{$symbol}{Price_Last_Trade} ? $self->{Kurs}{$symbol}{Price_Last_Trade} : $self->{Portofolios}{$depot}{$pos}{Price_Buy};
-      $self->{Portofolios}{$depot}{$pos}{Price}              = $self->{Portofolios}{$depot}{$pos}{Quantity} * $self->{Portofolios}{$depot}{$pos}{Price_Share};
-      $self->{Portofolios}{$depot}{$pos}{Change}             = $self->{Portofolios}{$depot}{$pos}{Price} - $self->{Portofolios}{$depot}{$pos}{Price_Buy_Pos};
-      $self->{Portofolios}{$depot}{$pos}{Change_Percent}     = $self->{Portofolios}{$depot}{$pos}{Price_Buy_Pos} ? 100 * $self->{Portofolios}{$depot}{$pos}{Change} / $self->{Portofolios}{$depot}{$pos}{Price_Buy_Pos} : 0;
-      $self->{Portofolios}{$depot}{$pos}{Change_Day}         = $self->{Portofolios}{$depot}{$pos}{Quantity} * $self->{Kurs}{$symbol}{net};
-      $self->{Portofolios}{$depot}{$pos}{Change_Day_Percent} = $self->{Kurs}{$symbol}{p_change};
-      $self->{Portofolios}{$depot}{$pos}{Change_Day_Percent} =~ s/%$// if (defined($self->{Portofolios}{$depot}{$pos}{Change_Day_Percent}));
-      $self->{Portofolios}{$depot}{$pos}{Price_Last}         = $self->{Portofolios}{$depot}{$pos}{Price} - $self->{Portofolios}{$depot}{$pos}{Change_Day};
-  
-      $self->{Portofolios}{$depot}{$pos}{Dividend_Pos}       = $self->{Portofolios}{$depot}{$pos}{Quantity} * $self->{Portofolios}{$depot}{$pos}{Dividend};
-      $self->{Portofolios}{$depot}{$pos}{Dividend_Percent}   = $self->{Portofolios}{$depot}{$pos}{Price} ? 100 * $self->{Portofolios}{$depot}{$pos}{Dividend_Pos} / $self->{Portofolios}{$depot}{$pos}{Price} : 0;
-      $self->{Portofolios}{$depot}{$pos}{Div_Summe}          = $self->{Portofolios}{$depot}{$pos}{Quantity} * $self->{Kurs}{$symbol}{div};
-
-      # Price_Buy_Pos, Price, Change_Day und Dividend_Pos werden fuer die Summe aufaddiert, fuer den Rest ermittelt
-      $self->{Portofolios}{Summe}{$depot}{Price_Buy_Pos}    += $self->{Portofolios}{$depot}{$pos}{Price_Buy_Pos};
-      $self->{Portofolios}{Summe}{$depot}{Price}            += $self->{Portofolios}{$depot}{$pos}{Price};
-      $self->{Portofolios}{Summe}{$depot}{Price_Last}       += $self->{Portofolios}{$depot}{$pos}{Price_Last};
-      $self->{Portofolios}{Summe}{$depot}{Change_Day}       += $self->{Portofolios}{$depot}{$pos}{Change_Day};
-      $self->{Portofolios}{Summe}{$depot}{Dividend_Pos}     += $self->{Portofolios}{$depot}{$pos}{Dividend_Pos} ;
-    }
-  }
-  foreach my $pos (keys %{$self->{Portofolios}{$depot}}) {
-    $self->{Portofolios}{$depot}{$pos}{Portion}            =  $self->{Portofolios}{Summe}{$depot}{Price} ? 100 * $self->{Portofolios}{$depot}{$pos}{Price} / $self->{Portofolios}{Summe}{$depot}{Price} : 100;
-  }
-
-  # Im Anschluß die Depotsummenwerte bearbeiten
-  $self->{Portofolios}{Summe}{$depot}{Change}               = $self->{Portofolios}{Summe}{$depot}{Price} - $self->{Portofolios}{Summe}{$depot}{Price_Buy_Pos};
-  $self->{Portofolios}{Summe}{$depot}{Change_Percent}       = $self->{Portofolios}{Summe}{$depot}{Price_Buy_Pos}  ? 100 * $self->{Portofolios}{Summe}{$depot}{Change} / $self->{Portofolios}{Summe}{$depot}{Price_Buy_Pos}       : 0;
-  $self->{Portofolios}{Summe}{$depot}{Change_Day_Percent}   = $self->{Portofolios}{Summe}{$depot}{Price_Last} ? 100 * ($self->{Portofolios}{Summe}{$depot}{Price} / $self->{Portofolios}{Summe}{$depot}{Price_Last} - 1) : 100;
-  $self->{Portofolios}{Summe}{$depot}{Dividend_Percent}     = $self->{Portofolios}{Summe}{$depot}{Price_Buy_Pos}  ? 100 * $self->{Portofolios}{Summe}{$depot}{Dividend_Pos} / $self->{Portofolios}{Summe}{$depot}{Price}        : 0;
-}
+} ## end sub Portofolios_summieren
 
 
 sub Portofolios_analysieren {
   #################################################################
   # Ermittelt Kennzahlen zu den Portofolios
-  # Ergebnis: In der Datenstruktur $self->{Portofolios} liegt
-  # ein Hash (Portofolios/Watchlists/Summe) von Hashes (Aktienposition) mit:
   #
-  # PW  Rating             : Hash aus Portion, Yield, Win, DayWin, LastTrade, Neutral
-  # PW  Branche            : Branche
-  # PW  Quantity           : Amount of Shares in Position
-  # PWS Price              : Aktueller Preis der Position
-  # PWS Price_Buy_Pos      : Kaufpreis der Position
-  # PWS Price_Buy          : Kaufpreis einer Aktie
-  # PWS Change             : Absolute Veraenderung
-  # PWS Change_Percent     : Prozentuale Veraenderung
-  # PWS Change_Day         : Absolute Veraenderung am aktuellen Tag
-  # PWS Change_Day_Percent : Prozentuale Veraenderung am aktuellen Tag
-  # PWS Div_Summe          : Dividenden Summe ermittelt aus der Stockinfo
-  # PWS Dividend_Pos       : Absolute Dividende in Position
-  # PWS Dividend           : Dividende per Share
-  # PWS Dividend_Percent   : Prozentuale Dividende bezogen auf den aktuellen Wert
-
-  # PWS Price_EUR          : Current Price of whole Position in EUR
-
-  # Depot_Weight           : Percentage Depot Weight of Position
-  # _PercentDepotDayChange : Percentage daily Depot Price Change of Position in Total
-  # _PercentDepotChange    : Percentage Depot Price Change of Position in Total
-
-  # _PercentDayChange      : Daily percentage Change
-  # _PercentChange         : Total percentage Change
+  # PW  Rating              : Bewertung des Basiswertes
+  # PWS Weight              : Anteil der Position am Depot
   #
 
   #
@@ -1225,42 +1266,34 @@ sub Portofolios_analysieren {
 
   my $rc = 0;
 
-          
-#          if (looks_like_number($self->{Portofolios}{$PFName}{$pos_count}{Quantity}) && $self->{Portofolios}{$PFName}{$pos_count}{Quantity} && 
-#              looks_like_number($self->{Portofolios}{$PFName}{$pos_count}{Price_Buy_Pos})) {
-#            $self->{Portofolios}{$PFName}{$pos_count}{Price_Buy} = $self->{Portofolios}{$PFName}{$pos_count}{Price_Buy_Pos} / $self->{Portofolios}{$PFName}{$pos_count}{Quantity};
-#          } else {
-#            Trace->Trc('I', 2, 0x0220f, $PFName, $pos_count, $self->{Portofolios}{$PFName}{$pos_count}{Quantity}, looks_like_number($self->{Portofolios}{$PFName}{$pos_count}{Quantity}), $self->{Portofolios}{$PFName}{$pos_count}{Price_Buy_Pos}, looks_like_number($self->{Portofolios}{$PFName}{$pos_count}{Price_Buy_Pos}));
-#            $self->{Portofolios}{$PFName}{$pos_count}{Price_Buy} = '0';
-#          }
-
   POSIX::setlocale(&POSIX::LC_ALL, 'de_DE');
-  $self->{Portofolios}{Summe} = {};
-  # Berechnung und Aufsummieren der Positionswerte
-  foreach (keys %{$self->{Portofolios}}) {
-    next if ($_ eq 'Summe');
-    $self->_calculate($_);
-  }
-  
-  # Gewichtung der Portofolios berechnen
-  foreach (keys %{$self->{Portofolios}{Summe}}) {
-    if ($_ =~ /Portofolio .*/) {
-      $self->{Portofolios}{Summe}{$_}{Portion} = $self->{Portofolios}{Summe}{"Watchlist $self->{Gesamtliste}"}{Price} ? 100 * $self->{Portofolios}{Summe}{$_}{Price} / $self->{Portofolios}{Summe}{"Watchlist $self->{Gesamtliste}"}{Price} : 0;
-    } else {
-      $self->{Portofolios}{Summe}{$_}{Portion} = '';
-    }
-  }
+
   foreach my $depot (keys %{$self->{Portofolios}}) {
-    # Die Werte aller Positionen sind ermittelt.
-    # Jetzt kann die Rating und Formatierung aller Positionen erfolgen
     foreach my $pos (keys %{$self->{Portofolios}{$depot}}) {
-      my $symbol = (split(' ', $pos))[0];
+      # Gewichtung berechnen
+      if ($depot eq 'Summe') {
+        if ($pos =~ /Portofolio .*/) {
+          my $posptr  = $self->{Portofolios}{Summe}{$pos};
+          $posptr->{Change_Percent}     = $posptr->{Price_Buy_Pos} ? 100 * $posptr->{Change_Pos} / $posptr->{Price_Buy_Pos} : 0;
+          $posptr->{Change_Day_Percent} = $posptr->{Price_Last_Pos} ? 100 * $posptr->{Change_Day_Pos} / $posptr->{Price_Last_Pos} : 0;
+          $posptr->{Weight}             = $self->{Portofolios}{Summe}{"Watchlist $self->{Gesamtliste}"}{Price_Pos} ? 100 * $posptr->{Price_Pos} / $self->{Portofolios}{Summe}{"Watchlist $self->{Gesamtliste}"}{Price_Pos} : 0;
+          $posptr->{Dividend_Yield}     = $posptr->{Price_Pos} ? 100 * $posptr->{Dividend_Pos} / $posptr->{Price_Pos} : 0;
+        } else {
+          $self->{Portofolios}{Summe}{$pos}{Weight} = '';
+        }
+      } else {
+        $self->{Portofolios}{$depot}{$pos}{Weight} = $self->{Portofolios}{Summe}{$depot}{Price_Pos} ? 100 * $self->{Portofolios}{$depot}{$pos}{Price_Pos} / $self->{Portofolios}{Summe}{$depot}{Price_Pos} : 0;
+      }
       # Position bewerten
-      $self->{Portofolios}{$depot}{$pos}{Rating}{LastTrade} = $symbol ? rating('desc',  defined($self->{Kurs}{$symbol}{_lastTrade}) ? $self->{Kurs}{$symbol}{_lastTrade} : 0, 10, 7, 2, 0) : 0;
-      $self->{Portofolios}{$depot}{$pos}{Rating}{Win}       = rating('asc',   $self->{Portofolios}{$depot}{$pos}{Change_Percent}, -10, -5, 5, 10);
-      $self->{Portofolios}{$depot}{$pos}{Rating}{DayWin}    = rating('asc',   $self->{Portofolios}{$depot}{$pos}{Change_Day_Percent}, -2, -1, 1, 2);
-      $self->{Portofolios}{$depot}{$pos}{Rating}{Portion}   = rating('range', $self->{Portofolios}{$depot}{$pos}{Portion}, 0, 1, 3, 6, 10);
-      $self->{Portofolios}{$depot}{$pos}{Rating}{Yield}     = rating('asc',   $self->{Portofolios}{$depot}{$pos}{Dividend_Percent}, 1, 2, 3, 4);
+      $self->{Portofolios}{$depot}{$pos}{Rating}{Last_Trade_Days_ago} = 0;
+      if (my $symbol = $self->{Portofolios}{$depot}{$pos}{Symbol}) {
+        $symbol = (split(/\./, $symbol))[0];
+        $self->{Portofolios}{$depot}{$pos}{Rating}{Last_Trade_Days_ago} = rating('desc',  defined($self->{Kurs}{$symbol}{Last_Trade_Days_ago}) ? $self->{Kurs}{$symbol}{Last_Trade_Days_ago} : 0, 10, 7, 2, 0);
+      }
+      $self->{Portofolios}{$depot}{$pos}{Rating}{Change_Percent}      = rating('asc',   $self->{Portofolios}{$depot}{$pos}{Change_Percent}, -10, -5, 5, 10);
+      $self->{Portofolios}{$depot}{$pos}{Rating}{Change_Day_Percent}  = rating('asc',   $self->{Portofolios}{$depot}{$pos}{Change_Day_Percent}, -2, -1, 1, 2);
+      $self->{Portofolios}{$depot}{$pos}{Rating}{Weight}              = rating('range', $self->{Portofolios}{$depot}{$pos}{Weight}, 0, 1, 3, 6, 10);
+      $self->{Portofolios}{$depot}{$pos}{Rating}{Dividend_Yield}      = rating('asc',   $self->{Portofolios}{$depot}{$pos}{Dividend_Yield}, 1, 2, 3, 4);
     }
   }
 
