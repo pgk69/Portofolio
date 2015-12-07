@@ -12,11 +12,12 @@ package PORTOFOLIO;
 #-------------------------------------------------------------------------------
 
 # use utf8;      # so literals and identifiers can be in UTF-8
-# use v5.12;     # or later to get "unicode_strings" feature
 # use strict;    # quote strings, declare variables
 # use warnings;  # on by default
 # use warnings  qw(FATAL utf8);    # fatalize encoding glitches
+use v5.16;     # or later to get "unicode_strings" feature
 use open qw(:utf8 :std);    # undeclared streams in UTF-8
+# no warnings 'redefine';
 
 # use charnames qw(:full :short);  # unneeded in v5.16
 # binmode STDOUT, ":utf8";
@@ -476,7 +477,7 @@ sub _webabruf_QUOTE {
             $infoval = substr($infoval, 0, $self->{Flags}{$_}{Laenge})
           }
           $posval{$_} = $infoval;
-          Trace->Trc('I', 2, 0x02102, $symbol, $_, $posval{$_});
+          Trace->Trc('I', 5, 0x02102, $symbol, $_, $posval{$_});
         }
         
         # $self->{Kurs} aktualisieren, falls das Ergebnis neuer ist
@@ -509,7 +510,7 @@ sub _webabruf_QUOTE {
           if (!defined($$kursptr{Symbol}) || ($$kursptr{Symbol} eq '')) {$$kursptr{Symbol} = $symbol}
           if (!defined($$kursptr{Stock_Exchange}) || ($$kursptr{Stock_Exchange} eq '')) {$$kursptr{Stock_Exchange} = $quelle}
         }
-        Trace->Trc('I', 2, 0x02102, $symbol, $$kursptr{Name}, $$kursptr{Last_Trade_Days_ago});
+        Trace->Trc('I', 5, 0x02102, $symbol, $$kursptr{Name}, $$kursptr{Last_Trade_Days_ago});
       }
     }
   }
@@ -788,7 +789,7 @@ sub Gesamtliste_erzeugen {
       }
     }
   }
-  $PFHash{"Watchlist $self->{Gesamtliste}"} = \%gesamtliste;
+  $PFHash{"Watchlist Summe"} = \%gesamtliste;
 
   $self->{PFHash} = \%PFHash;
   
@@ -845,8 +846,8 @@ sub Positionen_parsen {
           foreach (keys(%{$self->{Flags}})) {
             $attrHash->{$_} = $self->{Flags}{$_}{Default};
           }
-          $attrHash->{Symbol}       = $pos;
-          $attrHash->{Symbol_Local} = $pos_alternativs_sort;
+          $attrHash->{Symbol}        = $pos;
+          $attrHash->{Symbols_Local} = $pos_alternativs_sort;
 
           my @attrArr = split(/\|/, $exg_anz_prz);
           if (scalar @attrArr > 1) {
@@ -867,6 +868,9 @@ sub Positionen_parsen {
             my $dummy = decode_json $exg_anz_prz;
             foreach (keys(%{$dummy})) {
               $attrHash->{$_} = $dummy->{$_};
+            }
+            if (!defined($attrHash->{Price_Buy_Pos}) && defined($attrHash->{Price_Buy}) && defined($attrHash->{Quantity}) && looks_like_number($attrHash->{Quantity})) {
+              $attrHash->{Price_Buy_Pos} = $attrHash->{Quantity} * $attrHash->{Price_Buy};
             }
             $attrHash->{Currency}          ||= $self->{BasisCur};
             if (!defined(code2currency($attrHash->{Currency}))) {
@@ -1083,9 +1087,10 @@ sub Portofolios_summieren {
   # PW  Name                : Name der Position
   # PW  WKN                 : WKN der Position
   # PW  Symbol              : Kurzsymbol der Position
-  # PW  Symbol_Local        : Symbol der Position mit Handalsplatz
+  # PW  Symbols_Local       : Symbol der Position mit Handalsplatz
   # PW  Branche             : Branche
   # PW  Quantity            : Amount of Shares in Position
+  # PWS Weight_Dep          : Weighth of the Position in the Portofolio
   # PW  Price               : Aktueller Preis per Share
   # PW  Price_Pos           : Aktueller Preis der Position
   # PW  Price_Last          : Letzter Preis per Share
@@ -1094,15 +1099,15 @@ sub Portofolios_summieren {
   # PWS Price_Buy_Pos       : Kaufpreis der Position
   # PW  Change              : Absolute Veraenderung per Share seit Kauf
   # PWS Change_Pos          : Absolute Veraenderung der Position seit Kauf
-  # PW  Change_Percent      : Prozentuale Veraenderung seit Kauf
+  # PWS Change_Percent      : Prozentuale Veraenderung seit Kauf
   # PW  Change_Day          : Absolute Veraenderung per Share am aktuellen Tag
   # PWS Change_Day_Pos      : Absolute Veraenderung der Position am aktuellen Tag
-  # PW  Change_Day_Percent  : Prozentuale Veraenderung am aktuellen Tag
+  # PWS Change_Day_Percent  : Prozentuale Veraenderung am aktuellen Tag
   # PW  Currency            : Waehrung der Position
   # PW  Dividend            : Dividende per Share
   # PWS Dividend_Pos        : Absolute Dividende in Position
   # PW  Dividend_Date       : Datum der Dividendenausschuettung
-  # PW  Dividend_Yield      : Prozentuale Dividende bezogen auf den aktuellen Wert
+  # PWS Dividend_Yield      : Prozentuale Dividende bezogen auf den aktuellen Wert
   # PW  Dividend_Currency   : Waehrung der Dividendenausschuettung
   # PW  Last_Trade          : Zeitpunkt des letzter Handels
   # PW  Last_Trade_Date     : Datum des letzter Handels
@@ -1146,20 +1151,23 @@ sub Portofolios_summieren {
         $self->{Portofolios}{$PFName} = \%PFHash;
       } 
 
+      $self->{Portofolios}{$PFName}{Summe} = {};
       foreach my $pos (keys %{$self->{Portofolios}{$PFName}}) {
+        next if ($pos eq 'Summe');
         # Aufsummieren aller Depotwerte in eine Depotsummenposition
         my $posptr  = $self->{Portofolios}{$PFName}{$pos};
-        my @symbols = split(/\|/, $posptr->{Symbol_Local});
-        # Todo: den passenden Eintrag aus Kurs ermitteln
+        my @symbols = split(/\|/, $posptr->{Symbols_Local});
         my %kurs;
         foreach (@symbols) {
           next if %kurs;
           if ($self->{Kurs}{$_}{aktuell}) {
             %kurs = %{$self->{Kurs}{$_}};
+            $posptr->{Symbol_Local} = $_;
           }
         }
         
         # Ergaenzen der Positionsinfos
+        $posptr->{Name}                ||= $kurs{Name};
         if (looks_like_number($posptr->{Quantity}) && $posptr->{Quantity} && looks_like_number($posptr->{Price_Buy_Pos})) {
           $posptr->{Price_Buy} = $posptr->{Price_Buy_Pos} / $posptr->{Quantity};
         } else {
@@ -1170,11 +1178,9 @@ sub Portofolios_summieren {
         $posptr->{Price_Pos}           = $posptr->{Quantity} * $posptr->{Price};
         $posptr->{Change}              = $posptr->{Price} - $posptr->{Price_Buy};
         $posptr->{Change_Pos}          = $posptr->{Price_Pos} - $posptr->{Price_Buy_Pos};
-        $posptr->{Change_Percent}      = $posptr->{Price_Buy_Pos} ? 100 * $posptr->{Change_Pos} / $posptr->{Price_Buy_Pos} : 0;
         $posptr->{Change_Day}          = $kurs{Change_Day} ? $kurs{Change_Day} : 0;
         $posptr->{Change_Day_Pos}      = $kurs{Change_Day} ? $posptr->{Quantity} * $kurs{Change_Day} : 0;
         $posptr->{Change_Day_Percent}  = $kurs{Change_Day_Percent} ? $kurs{Change_Day_Percent} : 0;
-        $posptr->{Change_Day_Percent}  =~ s/%$// if (defined($posptr->{Change_Day_Percent}));
         $posptr->{Price_Last}          = $posptr->{Price} - $posptr->{Change_Day};
         $posptr->{Price_Last_Pos}      = $posptr->{Price_Pos} - $posptr->{Change_Day_Pos};
         $posptr->{Last_Trade_Days_ago} = defined($kurs{Last_Trade_Days_ago}) ? $kurs{Last_Trade_Days_ago} : '';
@@ -1191,18 +1197,37 @@ sub Portofolios_summieren {
         # Dividendeninfos falls vorhanden aus Kurs holen andernfalls aus ini
         $posptr->{Dividend}            = $kurs{Dividend} if defined($kurs{Dividend});
         $posptr->{Dividend_Pos}        = $posptr->{Quantity} * $posptr->{Dividend};
-        $posptr->{Dividend_Yield}      = defined($kurs{Dividend_Yield}) ? $kurs{Dividend_Yield} : $posptr->{Price} ? 100 * $posptr->{Dividend} / $posptr->{Price} : 0;
         $posptr->{Dividend_Date}       = defined($kurs{Dividend_Date}) ? $kurs{Dividend_Date} : '';
         
-        # Aufsummieren der Werte fuer die Gesamtsumme
+        # Aufsummieren der Werte fuer die Gesamtsumme pro Portofolio
+        $self->{Portofolios}{$PFName}{Summe}{Price_Buy_Pos}  += $posptr->{Price_Buy_Pos};
+        $self->{Portofolios}{$PFName}{Summe}{Price_Last_Pos} += $posptr->{Price_Last_Pos};
+        $self->{Portofolios}{$PFName}{Summe}{Price_Pos}      += $posptr->{Price_Pos};
+        $self->{Portofolios}{$PFName}{Summe}{Change_Day_Pos} += $posptr->{Change_Day_Pos};
+        $self->{Portofolios}{$PFName}{Summe}{Change_Pos}     += $posptr->{Change_Pos};
+        $self->{Portofolios}{$PFName}{Summe}{Dividend_Pos}   += $posptr->{Dividend_Pos} ;
+
+        # Aufsummieren der Werte fuer die Uebersicht der Portofolios
         $self->{Portofolios}{Summe}{$PFName}{Price_Buy_Pos}  += $posptr->{Price_Buy_Pos};
         $self->{Portofolios}{Summe}{$PFName}{Price_Last_Pos} += $posptr->{Price_Last_Pos};
         $self->{Portofolios}{Summe}{$PFName}{Price_Pos}      += $posptr->{Price_Pos};
         $self->{Portofolios}{Summe}{$PFName}{Change_Day_Pos} += $posptr->{Change_Day_Pos};
         $self->{Portofolios}{Summe}{$PFName}{Change_Pos}     += $posptr->{Change_Pos};
         $self->{Portofolios}{Summe}{$PFName}{Dividend_Pos}   += $posptr->{Dividend_Pos} ;
+
+        # Aufsummieren der Werte fuer die Gesamtsumme der Uebersicht der Portofolios
+        # Falls es keine Watchlist ist
+        if ($PFName =~/^Portofolio /) {
+          $self->{Portofolios}{Summe}{Summe}{Price_Buy_Pos}  += $posptr->{Price_Buy_Pos};
+          $self->{Portofolios}{Summe}{Summe}{Price_Last_Pos} += $posptr->{Price_Last_Pos};
+          $self->{Portofolios}{Summe}{Summe}{Price_Pos}      += $posptr->{Price_Pos};
+          $self->{Portofolios}{Summe}{Summe}{Change_Day_Pos} += $posptr->{Change_Day_Pos};
+          $self->{Portofolios}{Summe}{Summe}{Change_Pos}     += $posptr->{Change_Pos};
+          $self->{Portofolios}{Summe}{Summe}{Dividend_Pos}   += $posptr->{Dividend_Pos} ;
+        }
       }
     }
+    $self->{Portofolios}{$PFName}{Summe}{Dividend_Currency} = $self->{BasisCur};
   }
 
   Trace->Trc('S', 1, 0x00002, $self->{subroutine});
@@ -1217,7 +1242,7 @@ sub Portofolios_analysieren {
   # Ermittelt Kennzahlen zu den Portofolios
   #
   # PW  Rating              : Bewertung des Basiswertes
-  # PWS Weight              : Anteil der Position am Depot
+  # PWS Weight_Dep          : Anteil der Position am Depot
   #
 
   #
@@ -1232,8 +1257,8 @@ sub Portofolios_analysieren {
   no autovivification;
   
   sub rating {
-    my $mode   = shift || 'asc';
     my $value  = shift || 0;
+    my $mode   = shift || 'asc';
     my $red    = shift || 0;
     my $yellow = shift || 0;
     my $blue   = shift || 0;
@@ -1270,30 +1295,38 @@ sub Portofolios_analysieren {
 
   foreach my $depot (keys %{$self->{Portofolios}}) {
     foreach my $pos (keys %{$self->{Portofolios}{$depot}}) {
-      # Gewichtung berechnen
-      if ($depot eq 'Summe') {
-        if ($pos =~ /Portofolio .*/) {
-          my $posptr  = $self->{Portofolios}{Summe}{$pos};
-          $posptr->{Change_Percent}     = $posptr->{Price_Buy_Pos} ? 100 * $posptr->{Change_Pos} / $posptr->{Price_Buy_Pos} : 0;
-          $posptr->{Change_Day_Percent} = $posptr->{Price_Last_Pos} ? 100 * $posptr->{Change_Day_Pos} / $posptr->{Price_Last_Pos} : 0;
-          $posptr->{Weight}             = $self->{Portofolios}{Summe}{"Watchlist $self->{Gesamtliste}"}{Price_Pos} ? 100 * $posptr->{Price_Pos} / $self->{Portofolios}{Summe}{"Watchlist $self->{Gesamtliste}"}{Price_Pos} : 0;
-          $posptr->{Dividend_Yield}     = $posptr->{Price_Pos} ? 100 * $posptr->{Dividend_Pos} / $posptr->{Price_Pos} : 0;
-        } else {
-          $self->{Portofolios}{Summe}{$pos}{Weight} = '';
-        }
+      my $posptr  = $self->{Portofolios}{$depot}{$pos};
+      my $kursptr = defined($posptr->{Symbol_Local}) ? $self->{Kurs}{$posptr->{Symbol_Local}} : undef;
+      # Prozentuale Werte und Gewichtung berechnen
+      if (defined($kursptr->{Dividend_Yield})) {
+        $posptr->{Dividend_Yield}       = $kursptr->{Dividend_Yield};
       } else {
-        $self->{Portofolios}{$depot}{$pos}{Weight} = $self->{Portofolios}{Summe}{$depot}{Price_Pos} ? 100 * $self->{Portofolios}{$depot}{$pos}{Price_Pos} / $self->{Portofolios}{Summe}{$depot}{Price_Pos} : 0;
+        if ($posptr->{Price}) {
+          $posptr->{Dividend_Yield}     = 100 * $posptr->{Dividend} / $posptr->{Price};
+        } else {
+          if ($posptr->{Price_Pos}) {
+            $posptr->{Dividend_Yield}   = 100 * $posptr->{Dividend_Pos} / $posptr->{Price_Pos};
+          } else {
+            $posptr->{Dividend_Yield}   = 0;
+          }
+        }
       }
+      $posptr->{Dividend_Currency}      = $self->{BasisCur};
+      $posptr->{Change_Percent}         = $posptr->{Price_Buy_Pos} ? 100 * $posptr->{Change_Pos} / $posptr->{Price_Buy_Pos} : 0;
+      if (!defined($posptr->{Change_Day_Percent})) {
+        $posptr->{Change_Day_Percent}   = $posptr->{Price_Last_Pos} ? 100 * $posptr->{Change_Day_Pos} / $posptr->{Price_Last_Pos} : 0;
+      }
+      $posptr->{Change_Day_Percent}     =~ s/%$// if (defined($posptr->{Change_Day_Percent}));
+      $posptr->{Weight_Dep}             = $self->{Portofolios}{$depot}{Summe}{Price_Pos} ? 100 * $posptr->{Price_Pos} / $self->{Portofolios}{$depot}{Summe}{Price_Pos} : 0;
+      $posptr->{Change_Percent_Dep}     = $self->{Portofolios}{$depot}{Summe}{Price_Pos} ? 100 * $posptr->{Change_Pos} / $self->{Portofolios}{$depot}{Summe}{Price_Pos} : 0;
+      $posptr->{Change_Day_Percent_Dep} = $self->{Portofolios}{$depot}{Summe}{Price_Pos} ? 100 * $posptr->{Change_Day_Pos} / $self->{Portofolios}{$depot}{Summe}{Price_Pos} : 0;
+
       # Position bewerten
-      $self->{Portofolios}{$depot}{$pos}{Rating}{Last_Trade_Days_ago} = 0;
-      if (my $symbol = $self->{Portofolios}{$depot}{$pos}{Symbol}) {
-        $symbol = (split(/\./, $symbol))[0];
-        $self->{Portofolios}{$depot}{$pos}{Rating}{Last_Trade_Days_ago} = rating('desc',  defined($self->{Kurs}{$symbol}{Last_Trade_Days_ago}) ? $self->{Kurs}{$symbol}{Last_Trade_Days_ago} : 0, 10, 7, 2, 0);
+      foreach my $attribute (keys %{$posptr}) {
+        if (my $range = Configuration->config("Rating", $attribute)) {
+          $posptr->{Rating}{$attribute} = color($self->{Color}->{rating($posptr->{$attribute}, split(' ', $range))});
+        }
       }
-      $self->{Portofolios}{$depot}{$pos}{Rating}{Change_Percent}      = rating('asc',   $self->{Portofolios}{$depot}{$pos}{Change_Percent}, -10, -5, 5, 10);
-      $self->{Portofolios}{$depot}{$pos}{Rating}{Change_Day_Percent}  = rating('asc',   $self->{Portofolios}{$depot}{$pos}{Change_Day_Percent}, -2, -1, 1, 2);
-      $self->{Portofolios}{$depot}{$pos}{Rating}{Weight}              = rating('range', $self->{Portofolios}{$depot}{$pos}{Weight}, 0, 1, 3, 6, 10);
-      $self->{Portofolios}{$depot}{$pos}{Rating}{Dividend_Yield}      = rating('asc',   $self->{Portofolios}{$depot}{$pos}{Dividend_Yield}, 1, 2, 3, 4);
     }
   }
 
@@ -1303,7 +1336,6 @@ sub Portofolios_analysieren {
         # @@@
         $self->{Kurs}{$symbol}{$flagname} = 0 if ($flagname =~ /^p_/ && $self->{Kurs}{$symbol}{$flagname} =~ /%$/);
         Trace->Trc('I', 5, 0x02210, $symbol, $flagname, $self->{Kurs}{$symbol}{$flagname}, $self->{Flags}{$flagname}{Format});
-#        $self->{Kurs}{$symbol}{$flagname} = sprintf($self->{Flags}{$flagname}{Format}, $self->{Kurs}{$symbol}{$flagname});
       }
     }
   }
@@ -1315,10 +1347,9 @@ sub Portofolios_analysieren {
 } ## end sub analysiere_Portofolios
 
 
-sub _createFormat {
+sub createFormatStrg {
   #################################################################
-  # Schreiben der Header Ausgabedatei(en)
-  # Ergebnis:
+  # Erzeuge den Ausgabeformatierstring
   #
 
   # Prozedurnummer 5
@@ -1326,165 +1357,77 @@ sub _createFormat {
 
   my $self = shift;
   
-  my %args = ('Typ'        => '', 
-              'Ausgabe'    => '', 
-              'Part'       => '', 
+  my %args = ('Type'       => '', 
               'Depot'      => '', 
               'Position'   => '',
-              'Background' => $self->{bg}->{normal},
+              'Attribute'  => '',
               @_);
-                
-  my $type    = $args{'Typ'};
-  my $ausgabe = $args{'Ausgabe'};
-  my $part    = $args{'Part'};
+
+  my $type    = $args{'Type'};
   my $depot   = $args{'Depot'};
   my $pos     = $args{'Position'};
+  my $att     = $args{'Attribute'};
   my $bg      = $args{'Background'};
   
-  $pos = 'Watchlist Summe' if ($pos eq 'Summe');
-  my $symbol = (split(' ', $pos))[0];
-
   my %formatHash;
-  if ($part eq 'Head') {
-    $formatHash{Portofolio} = $pos if defined($pos);
-  }
-  if ($part eq 'Data') {
-    $formatHash{Portofolio} = $depot if defined($depot);
-  }
-  $formatHash{Position}     = $pos if defined($pos);
-
-  # Sharedefinitionen
-  if (defined($self->{Kurs}{$symbol})) {
-    $formatHash{Symbol} = $symbol;
-    foreach (keys %{$self->{Kurs}{$symbol}}) {
-      $formatHash{$_} = $self->{Kurs}{$symbol}{$_} if (defined($self->{Kurs}{$symbol}{$_}));
-    }
-  }
-
-  # Depotdefinitionen
-  if ($type eq 'Portofolios') {
-    foreach (keys %{$self->{Portofolios}{$depot}{$pos}}) {
-      if (!ref($self->{Portofolios}{$depot}{$pos}{$_}) && defined($self->{Portofolios}{$depot}{$pos}{$_})) {
-        $formatHash{$_} = $self->{Portofolios}{$depot}{$pos}{$_};
-      }
-    }
-  }
-  
-  # Cashdefinitionen
-  if ($type eq 'Cash') {
-    my ($owner, $bank, $cur, $amount) = split('\|', $pos);
-    $formatHash{Inhaber}     = $owner  if defined($owner);
-    $formatHash{Bank}        = $bank   if defined($bank);
-    $formatHash{KtoWaehrung} = $cur    if defined($cur);
-    $formatHash{KtoStand}    = $amount if defined($amount);
-  }
-  
   # Konsolensteuerung (Farbe):
   # Shortcuts
-  $formatHash{C} = color($self->{Color}->{'clear'});
-  $formatHash{R} = color($self->{Color}->{'reset'});
-  $formatHash{N} = color($self->{Color}->{'neutral'});
-  $formatHash{I} = color($self->{Color}->{'invers'});
-  $formatHash{B} = color($bg) if $bg;
+  $formatHash{C_C} = color($self->{Color}->{'clear'});
+  $formatHash{R_C} = color($self->{Color}->{'reset'});
+  $formatHash{N_C} = color($self->{Color}->{'neutral'});
+  $formatHash{I_C} = color($self->{Color}->{'invers'});
+  $formatHash{B_C} = color($bg) if $bg;
 
   # Langversion
   foreach (keys(%{$self->{Color}})) {$formatHash{$_} = color($self->{Color}->{$_})}
   
-  # W : Aenderung seit Kauf
-  # D : Tagesaenderung
-  # P : Portion am Gesamtvermoegen
-  # Y : Dividend
-  # L : Letzter Kurs veraltet
-  foreach (keys %{$self->{Portofolios}{$depot}{$pos}{Rating}}) {
-    my $col = color($self->{Color}->{$self->{Portofolios}{$depot}{$pos}{Rating}{$_}});
-    $formatHash{substr($_, 0, 1)} = $col if (defined($col));
+  if ($type eq "Portofolios") {
+    # Aufnahme individueller Werte aus der Position
+    if (defined($self->{Portofolios}{$depot}{$pos})) {
+      $formatHash{Depot}    = $depot;
+      $formatHash{Position} = $pos;
+      foreach (keys %{$self->{Portofolios}{$depot}{$pos}}) {
+        if (!ref($self->{Portofolios}{$depot}{$pos}{$_}) && 
+            defined($self->{Portofolios}{$depot}{$pos}{$_} &&
+            !defined($formatHash{$_}))) {
+          $formatHash{$_} = $self->{Portofolios}{$depot}{$pos}{$_};
+        }
+      }
+      
+      # Aufnahme allgemeiner Werte aus der Kursinfo
+      if (defined($self->{Portofolios}{$depot}{$pos}{Symbol_Local} &&
+          defined($self->{Kurs}{$self->{Portofolios}{$depot}{$pos}{Symbol_Local}}))) {
+        foreach (keys %{$self->{Kurs}{$self->{Portofolios}{$depot}{$pos}{Symbol_Local}}}) {
+          if (!defined($formatHash{$_})) {
+            $formatHash{$_} = $self->{Kurs}{$self->{Portofolios}{$depot}{$pos}{Symbol_Local}}{$_};
+          }
+        }
+      }
+
+      # Colorierung der Rating Werte
+      foreach my $attribute (keys %{$self->{Portofolios}{$depot}{$pos}{Rating}}) {
+        $formatHash{"${attribute}_C"} = $self->{Portofolios}{$depot}{$pos}{Rating}{$attribute};
+      }
+    }
   }
-  
+
+  # Cashdefinitionen
+  if ($type eq "Cash") {
+    if (defined($self->{Cash}{$depot}{$pos}{$att})) {
+      $formatHash{Owner}            = $depot;
+      $formatHash{Bank}             = $pos;
+      $formatHash{Currency_Account} = $att;
+      $formatHash{Balance}          = $self->{Cash}{$depot}{$pos}{$att};
+    }
+  }
+
   # Ersetzen der '|' durch '/'
   foreach (keys(%formatHash)) {
     $formatHash{$_} =~s/\|/\//g;
   }
+  $self->{Formathash} = \%formatHash;
 
   return join('|', %formatHash);
-}
-
-
-sub _push {
-  #################################################################
-  # Schreiben der Header Ausgabedatei(en)
-  # Ergebnis:
-  #
-
-  # Prozedurnummer 5
-  #
-
-  my $self = shift;
- 
-  my $type    = shift;
-  my $ausgabe = shift;
-  my $depot   = shift;
-  my $part    = shift;
-  
-  my $owner  = $depot;
-
-  return if !defined(Configuration->config("Ausgabeformat_$ausgabe", $part));
-  
-  if ($part eq 'Data') {
-    # Ausgabe sortiert nach 'name' der Position
-    # Falls keine Kurs existert erfolgt auch keine Ausgabe
-    # Ausser bei der Summenausgabe
-    my %sortlist;
-    if ($type eq 'Portofolios') {
-      foreach (keys %{$self->{Portofolios}{$depot}}) {
-        if ($depot eq 'Summe') {
-          next if ($_ eq 'Watchlist Summe');  # Das Watchlist Depot mit der Summe aller Depotpositionen soll nicht in der Auflistung der Depots erscheinen
-          $sortlist{uc($depot . $_)} = $_;
-        } else {
-          my $symbol = (split(' ', $_))[0];
-          if ($self->{Kurs}{$symbol}{name}) {
-            $sortlist{uc($self->{Kurs}{$symbol}{name} . $_)} = $_;
-          }
-        }
-      }
-    }
-
-    if ($type eq 'Cash') {
-      foreach my $bank (keys %{$self->{Cash}{$owner}}) {
-        next if ($bank eq 'Summe');
-        foreach my $cur (keys %{$self->{Cash}{$owner}{$bank}}) {
-          $sortlist{"$owner|$bank|$cur"} = "$owner|$bank|$cur|$self->{Cash}{$owner}{$bank}{$cur}";
-        }
-      }
-    }
-
-    my $bg = $self->{Color}->{normal};
-    foreach (sort keys %sortlist) {
-      my $format = $self->_createFormat('Typ',        $type,
-                                        'Ausgabe',    $ausgabe,
-                                        'Part',       'Data',
-                                        'Depot',      $depot,
-                                        'Position',   $sortlist{$_},
-                                        'Background', $bg);  
-      $bg = $bg eq $self->{Color}->{normal} ? $self->{Color}->{invers} : $self->{Color}->{normal};
-      Trace->Trc('I', 10, "Format: <$format> wird angewendet auf Ausgabe: <" . Configuration->config("Ausgabeformat_$ausgabe", 'Data') . ">.");
-      my $ausgabestring = Utils::extendString(Configuration->config("Ausgabeformat_$ausgabe", 'Data'), $format);
-      Trace->Trc('I', 10, "Schreibe Data: <$ausgabe>  Depot: <$depot>: <$ausgabestring>");
-      push(@{$self->{Ausgabe}{$ausgabe}{$depot}}, $ausgabestring);
-    }
-  } elsif ($part eq 'Head') {
-    my $format = $self->_createFormat('Typ',      $type,
-                                      'Ausgabe',  $ausgabe,
-                                      'Part',     'Head',
-                                      'Depot',    'Summe',
-                                      'Position', $depot);  
-    my $ausgabestring = Utils::extendString(Configuration->config("Ausgabeformat_$ausgabe", 'Head'), $format);
-    Trace->Trc('I', 5, "Schreibe Head: <$ausgabe>  Depot: <$depot>: <$ausgabestring>");
-    push(@{$self->{Ausgabe}{$ausgabe}{$depot}}, $ausgabestring);
-  } else {
-    push(@{$self->{Ausgabe}{$ausgabe}{$depot}}, Utils::extendString(Configuration->config("Ausgabeformat_$ausgabe", $part), "R|" . color($self->{Color}->{'reset'})));
-  }
-  
-  return;
 }
 
 
@@ -1507,61 +1450,124 @@ sub Ausgabe_schreiben {
 
   my $rc = 0;
 
+  # Abarbeitung aller Portofolio- und Cash- Eintraege
   my %ausgabedatei = Configuration->config('Ausgabedatei');
-
-  # Abarbeitung aller Portofolios
   foreach my $depot (keys %{$self->{Portofolios}}) {
-    foreach $ausgabe (keys %ausgabedatei) {
-      next if ($ausgabe eq 'Cash');                           # Hier werden nur Portofolios behandelt
-      next if (($depot eq 'Summe') && ($ausgabe ne 'Summe')); # Depot Summe wird nur auf Ausgabe Summe geschrieben
-      next if (($depot ne 'Summe') && ($ausgabe eq 'Summe')); # und sonst nichts
-      Trace->Trc('I', 2, "Erzeuge Ausgabe fuer <$ausgabe>  Depot: <$depot>  Datei: <$ausgabedatei{$ausgabe}>.");
-      $self->_push('Portofolios', $ausgabe, $depot, 'Head');
-      $self->_push('Portofolios', $ausgabe, $depot, 'Sep');
-      $self->_push('Portofolios', $ausgabe, $depot, 'Col');
-      $self->_push('Portofolios', $ausgabe, $depot, 'Sep');
-      $self->_push('Portofolios', $ausgabe, $depot, 'Data');
+    Trace->Trc('I', 2, "Bearbeite Depot <$depot>.");
+    # Erzeuge Formatstring fuer Head
+    my $formatstring  = my $formatstringC = $self->createFormatStrg('Type',     'Portofolios', 
+                                                                    'Depot',    $depot,
+                                                                    'Position', 'Summe');
+    $formatstring =~ s/([^\|]*_C\|)[^\|]*/$1/g; 
+    foreach my $typ (keys %ausgabedatei) {
+      next if ($typ eq 'Cash');
+      next if (($typ eq 'Depot') && ($depot eq 'Summe'));
+      next if (($typ eq 'Export') && ($depot eq 'Summe'));
+      next if (($typ eq 'Summe') && ($depot ne 'Summe'));
+      my $name = Utils::extendString($ausgabedatei{$typ}, $formatstring, '');
+      $self->{Ausgabe}{$name}{Color} = Configuration->config("Ausgabeformat_$typ", 'Color') ? 1 : 0;
+      # Fuer alle Dateien
+      if (defined(my $head = Configuration->config("Ausgabeformat_$typ", 'Head'))) {
+        Trace->Trc('I', 5, "Bearbeite Ausgabedatei <$typ> Head <$head>.");
+        my $seperator = Configuration->config("Ausgabeformat_$typ", 'Sep');
+        my $colHead   = Configuration->config("Ausgabeformat_$typ", 'Col');
+        # Wenn Head dann erzeuge und Schreiben Headstring
+        if ($self->{Ausgabe}{$name}{Color}) {
+          push(@{$self->{Ausgabe}{$name}{Head}}, Utils::extendString($head, $formatstringC, ''));
+          push(@{$self->{Ausgabe}{$name}{Head}}, Utils::extendString($seperator, $formatstringC, '')) if (defined($seperator));
+          push(@{$self->{Ausgabe}{$name}{Head}}, Utils::extendString($colHead, $formatstringC, ''))   if (defined($colHead));
+          push(@{$self->{Ausgabe}{$name}{Head}}, Utils::extendString($seperator, $formatstringC, '')) if (defined($seperator));
+        } else {
+          push(@{$self->{Ausgabe}{$name}{Head}}, Utils::extendString($head, $formatstring, ''));
+          push(@{$self->{Ausgabe}{$name}{Head}}, Utils::extendString($seperator, $formatstring, '')) if (defined($seperator));
+          push(@{$self->{Ausgabe}{$name}{Head}}, Utils::extendString($colHead, $formatstring, ''))   if (defined($colHead));
+          push(@{$self->{Ausgabe}{$name}{Head}}, Utils::extendString($seperator, $formatstring, '')) if (defined($seperator));
+        }
+      }
+    }
+    foreach my $pos (keys %{$self->{Portofolios}{$depot}}) {
+      # Fuer alle Positionen <> Summe
+      next if ($pos eq 'Summe');
+      # Erzeuge Formatstring fuer Zeile
+      my $formatstring  = my $formatstringC = $self->createFormatStrg('Type',     'Portofolios', 
+                                                                      'Depot',    $depot,
+                                                                      'Position', $pos);
+      $formatstring =~ s/([^\|]*_C\|)[^\|]*/$1/g;
+      my $posname = my $cntposname = defined($self->{Portofolios}{$depot}{$pos}{Name}) ? uc($self->{Portofolios}{$depot}{$pos}{Name}) : uc($pos);
+      foreach my $typ (keys %ausgabedatei) {
+        next if ($typ eq 'Cash');
+        next if (($typ eq 'Depot') && ($depot eq 'Summe'));
+        next if (($typ eq 'Export') && ($depot eq 'Summe'));
+        next if (($typ eq 'Summe') && ($depot ne 'Summe'));
+        my $name = Utils::extendString($ausgabedatei{$typ}, $formatstring, '');
+        $self->{Ausgabe}{$name}{Color} = Configuration->config("Ausgabeformat_$typ", 'Color') ? 1 : 0;
+        # Fuer alle Dateien
+        if (defined(my $data = Configuration->config("Ausgabeformat_$typ", 'Data'))) {
+          Trace->Trc('I', 5, "Bearbeite Ausgabedatei <$typ> Position <$pos>");
+          # Wenn Data dann erzeuge und Schreiben Datastring
+          my $count = 1;
+          while (defined($self->{Ausgabe}{$name}{Data}{$posname})) {
+            $posname = uc("$cntposname $count++");
+          }
+          if ($self->{Ausgabe}{$name}{Color}) {
+            $self->{Ausgabe}{$name}{Data}{$posname} = Utils::extendString($data, $formatstringC, '');
+          } else {
+            $self->{Ausgabe}{$name}{Data}{$posname} =  Utils::extendString($data, $formatstring, '');
+          }
+        }
+      }
     }
   }
-
+  
   # Abarbeitung der Cashliste
-  foreach my $owner (keys %{$self->{Cash}}) {
-    foreach $ausgabe (keys %ausgabedatei) {
-      next if ($ausgabe ne 'Cash');                           # Hier wird nur Cash behandelt
-      Trace->Trc('I', 2, "Erzeuge Ausgabe fuer <$ausgabe>  Inhaber: <$owner>  Datei: <$ausgabedatei{$ausgabe}>.");
-      $self->_push('Cash', $ausgabe, $owner, 'Head');
-      $self->_push('Cash', $ausgabe, $owner, 'Sep');
-      $self->_push('Cash', $ausgabe, $owner, 'Col');
-      $self->_push('Cash', $ausgabe, $owner, 'Sep');
-      $self->_push('Cash', $ausgabe, $owner, 'Data');
+  my $count = 0;
+  foreach my $owner (sort keys %{$self->{Cash}}) {
+    foreach my $bank (sort keys %{$self->{Cash}{$owner}}) {
+      next if ($bank eq 'Summe');
+      foreach my $currency (sort keys %{$self->{Cash}{$owner}{$bank}}) {
+        my $formatstring = $self->createFormatStrg('Type',      'Cash', 
+                                                   'Depot',     $owner,
+                                                   'Position',  $bank,
+                                                   'Attribute', $currency); 
+        my $name = Utils::extendString($ausgabedatei{'Cash'}, $formatstring, '');
+        if (defined(my $head = Configuration->config("Ausgabeformat_Cash", 'Head'))) {
+          push(@{$self->{Ausgabe}{$name}{Head}}, Utils::extendString($head, $formatstring, ''));
+        }
+        if (defined(my $data = Configuration->config("Ausgabeformat_Cash", 'Data'))) {
+          $self->{Ausgabe}{$name}{Data}{$count++} = Utils::extendString($data, $formatstring, '');
+        }
+      }
     }
   }
 
   # Ausgabedateien schreiben
   my %tmpdatei;
-  foreach my $ausgabe (keys %{$self->{Ausgabe}}) {
-    foreach my $depot (keys %{$self->{Ausgabe}{$ausgabe}}) {
-      my $dateiname = Utils::extendString($ausgabedatei{$ausgabe}, "Depot|$depot|Inhaber|$depot");
-      Trace->Trc('I', 2, 0x02501, $depot, $dateiname);
-      if (!CmdLine->argument(0) || $depot ne 'Summe') {
+  foreach my $name (keys %{$self->{Ausgabe}}) {
+    Trace->Trc('I', 2, 0x02501, $name);
+    eval {mkpath(dirname($name));};
+    $tmpdatei{$name} = $name . ".$$";
+    open(DEPOT, '>> ' . $tmpdatei{$name});
+    while (my $line = shift(@{$self->{Ausgabe}{$name}{Head}})) {
+      if ($self->{Ausgabe}{$name}{Color}) {
+        $line = $line . color($self->{Color}->{reset});
+      }
+      print DEPOT "$line\n";
+    }
+    # Data alphabetisch sortiert ausgeben
+    my $bg = $self->{Color}->{normal};
+    foreach my $posname (sort keys %{$self->{Ausgabe}{$name}{Data}}) {
+      my $line = $self->{Ausgabe}{$name}{Data}{$posname};
+      if ($self->{Ausgabe}{$name}{Color}) {
+        $line = color($bg) . $line . color($self->{Color}->{reset});
+        $bg = $bg eq $self->{Color}->{normal} ? $self->{Color}->{invers} : $self->{Color}->{normal};
+      }
+      print DEPOT "$line\n";
+    }
+    close(DEPOT);
+  }
 
-        # Anlegen
-        #Trace->Log($ausgabe, Utils::extendString($ausgabedatei{$ausgabe} . '.tmp', "Depot|$depot")) or Trace->Exit(1, 0, 0x00010, $ausgabedatei{$ausgabe}, "Depot|$depot");
-        eval {mkpath(dirname($dateiname));};
-        $tmpdatei{$dateiname} = $$;
-        open(DEPOT, '>> ' . $dateiname . ".$$");
-        while (my $line = shift(@{$self->{Ausgabe}{$ausgabe}{$depot}})) {
-          print DEPOT "$line\n";
-        }
-
-        # Schliessen und Umbenennen
-        #$self->TerminateLog($ausgabe);
-        close(DEPOT);
-      } ## end if (!CmdLine->argument...)
-    } ## end foreach my $depot (keys %{$self...})
-  } ## end foreach my $ausgabe (keys %...)
-
-  foreach (keys %tmpdatei) {move("$_.$$", $_)}
+  # Atomares Erzeugen der Zieldateien
+  foreach (keys %tmpdatei) {move($tmpdatei{$_}, $_)}
 
   # Kursinfos löschen
   if (exists($self->{VarFile})) {
@@ -1573,145 +1579,6 @@ sub Ausgabe_schreiben {
 
   return $rc;
 } ## end sub schreibe_Ausgabe
-
-
-sub parse_Positionen_save {
-  #####################################################################
-  # Parse die Eintraege fuer alle Positionen
-
-  #
-  # Prozedurnummer 3
-  #
-  my $self = shift;
-
-  my $merker = $self->{subroutine};
-  $self->{subroutine} = (caller(0))[3];
-  Trace->Trc('S', 1, 0x00001, $self->{subroutine}, $self->{Eingabedatei});
-
-  my $rc = 0;
-
-  my %PFHash = %{$self->{PFHash}};
-  
-  if (exists($self->{VarFile})) {
-    eval {$self->{Kurs} = retrieve($self->{VarFile});};
-  }
-
-  # Datenstruktur zum Sammeln der Kursinformatinen zu allen Positionen anlegen
-  # und mit Werten aus der INI fuellen
-  foreach my $PFName (sort(keys(%PFHash))) {
-    # Fuer jedes gefundene Protofolio/jede Watchlist, der/die Elemente (Aktienpositionen) enthaelt
-    if (scalar keys %{$PFHash{$PFName}}) {
-      foreach my $pos (keys %{$PFHash{$PFName}}) {
-        # Fuer jedes Aktienpositionen
-        # Falls die Position mehrfach vorkommt sammel alle Vorkommen in einem Array
-        # Falls die Position nur einmal vorkommt schieb das Element in den Array
-        my @stockattributearray = ref($PFHash{$PFName}{$pos}) ? @{$PFHash{$PFName}{$pos}} : $PFHash{$PFName}{$pos};
-        # Im Array @stockattributearray liegen ein oder mehrere Elemente
-        if ($self->{SumPos} && $#stockattributearray) {
-          # Falls gewuenscht, Aufsummieren aller Einzelpositionen so, dass am Ende nur noch eine Arrayelement mit allen aufsummierten Positionen uebrig bleibt
-          my $attrHash;
-          while ($#stockattributearray >= 0) {
-            my $exg_anz_prz = shift(@stockattributearray);
-            Trace->Trc('I', 5, "Parse line <$exg_anz_prz>");
-            my @attrArr = split('\|', $exg_anz_prz);
-            if (scalar @attrArr > 1) {
-              # Alte Notation: CAD|740|10433.2|0.147|Rohstoff||
-              $attrHash->{Currency}           = $attrArr[0] || 'EUR';
-              if (!defined(code2currency($attrHash->{Currency}))) {
-                Trace->Trc('I', 2, 0x02213, $attrHash->{Currency});
-                next;
-              }
-              $attrHash->{Dividend_Currency} = $attrHash->{Currency};
-              $attrHash->{Price_Buy_Pos}    += $attrArr[2] || 0;    # ToDo: Umrechnen
-              $attrHash->{Dividend}          = $attrArr[3] || '0';  # ToDo: Umrechnen
-              $attrHash->{Quantity}         += $attrArr[1] || 0;
-              $attrHash->{Branche}           = $attrArr[4] || '';
-            } else {
-              # Neue JSON Notation: {Currency:"CAD", Quantity:740, Price_Buy_Pos:10433.2, Dividend:0.147, Branche:"Rohstoff", WKN:1234567,  Name:"Willi was here"}
-              my $helper = decode_json $exg_anz_prz;
-              $attrHash->{Currency}          = $helper->{Currency} || 'EUR';
-              if (!defined(code2currency($attrHash->{Currency}))) {
-                Trace->Trc('I', 2, 0x02213, $attrHash->{Currency});
-                next;
-              }
-              $attrHash->{Dividend_Currency} = $helper->{Dividend_Currency} || $helper->{Currency};
-              if (!defined(code2currency($attrHash->{Dividend_Currency}))) {
-                Trace->Trc('I', 2, 0x02213, $attrHash->{Dividend_Currency});
-                next;
-              }
-              $attrHash->{Quantity}         += $helper->{Quantity} || 0;
-              $attrHash->{Price_Buy_Pos}    += $helper->{Price_Buy_Pos} || 0;  # ToDo: Umrechnen
-              $attrHash->{Dividend}          = $helper->{Dividend} || '0';  # ToDo: Umrechnen
-              $attrHash->{Branche}           = $helper->{Branche} || '';
-            }
-          }
-          $stockattributearray[0] = join('|', ($attrHash->{Currency}, $attrHash->{Quantity}, $attrHash->{Price_Buy_Pos}, $attrHash->{Dividend}, $attrHash->{Branche}, ''));
-          Trace->Trc('I', 5, 0x02206, $PFName, $pos, $attrHash->{Quantity});
-        } ## end if ($self->{SumPos} &&...)
-        my $poscount = 0;
-        foreach my $exg_anz_prz (@stockattributearray) {
-          $poscount++;
-          my $ppos = "$pos $poscount";
-          my $attrHash;
-          my @attrArr = split('\|', $exg_anz_prz);
-          Trace->Trc('I', 5, "Parse line <$exg_anz_prz>");
-          if (scalar @attrArr > 1) {
-            # Alte Notation: CAD|740|10433.2|0.147|Rohstoff||
-            $attrHash->{Currency}           = $attrArr[0] || 'EUR';
-            if (!defined(code2currency($attrHash->{Currency}))) {
-              Trace->Trc('I', 2, 0x02213, $attrHash->{Currency});
-              next;
-            }
-            $attrHash->{Dividend_Currency} = $attrHash->{Currency};
-            $attrHash->{Quantity}          = $attrArr[1];
-            $attrHash->{Price_Buy_Pos}     = $attrArr[2];  # ToDo: Umrechnen
-            $attrHash->{Dividend}          = $attrArr[3] || '0';  # ToDo: Umrechnen
-            $attrHash->{Branche}           = $attrArr[4] || '';
-            $attrHash->{Last}              = (defined($attrArr[5]) && $attrArr[5] =~ m/^([-+]?)([0-9]*).*$/) ? $attrArr[5] : 0;
-          } else {
-            # Neue JSON Notation: {Currency:"CAD", Quantity:740, Price_Buy_Pos:10433.2, Dividend:0.147, Branche:"Rohstoff", WKN:1234567,  Name:"Willi was here"}
-            $attrHash = decode_json $exg_anz_prz;
-            $attrHash->{Currency}           ||= 'EUR';
-            if (!defined(code2currency($attrHash->{Currency}))) {
-              Trace->Trc('I', 2, 0x02213, $attrHash->{Currency});
-              next;
-            }
-            $attrHash->{Dividend_Currency} ||= $attrHash->{Currency};
-            if (!defined(code2currency($attrHash->{Dividend_Currency}))) {
-              Trace->Trc('I', 2, 0x02213, $attrHash->{Dividend_Currency});
-              next;
-            }
-            $attrHash->{Last}              = 0 if (!defined($attrHash->{Last}) || ($attrHash->{Last} !~ m/^([-+]?)([0-9]*).*$/));
-          }
-
-          $self->{Portofolios}{$PFName}{$ppos}{Dividend} = 0;
-          $self->{Portofolios}{$PFName}{$ppos}{Branche}  = '';
-          $self->{Kurs}{$pos}{_Waehrung}                 = defined($attrHash->{Currency}) ? $attrHash->{Currency} : 'EUR';
-          $self->{Kurs}{$pos}{_last}                     = $attrHash->{Last};
-
-          foreach (keys(%{$attrHash})) {
-            $self->{Portofolios}{$PFName}{$ppos}{$_}     = defined($attrHash->{$_}) ? $attrHash->{$_} : '';
-          }
-          
-          if (looks_like_number($self->{Portofolios}{$PFName}{$ppos}{Quantity}) && $self->{Portofolios}{$PFName}{$ppos}{Quantity} && 
-              looks_like_number($self->{Portofolios}{$PFName}{$ppos}{Price_Buy_Pos})) {
-            $self->{Portofolios}{$PFName}{$ppos}{Price_Buy} = $self->{Portofolios}{$PFName}{$ppos}{Price_Buy_Pos} / $self->{Portofolios}{$PFName}{$ppos}{Quantity};
-          } else {
-            Trace->Trc('I', 2, 0x0220f, $PFName, $ppos, $self->{Portofolios}{$PFName}{$ppos}{Quantity}, looks_like_number($self->{Portofolios}{$PFName}{$ppos}{Quantity}), $self->{Portofolios}{$PFName}{$ppos}{Price_Buy_Pos}, looks_like_number($self->{Portofolios}{$PFName}{$ppos}{Price_Buy_Pos}));
-            $self->{Portofolios}{$PFName}{$ppos}{Price_Buy} = '0';
-          }
-        } ## end foreach my $exg_anz_prz (@stockattributearray)
-      } ## end foreach my $pos (keys %{$PFHash...})
-    } ## end if (scalar keys %{$PFHash...})
-  } ## end foreach my $PFName ...
-  
-  delete($self->{PFHash});
-
-  Trace->Trc('S', 1, 0x00002, $self->{subroutine});
-  $self->{subroutine} = $merker;
-
-  return $rc;
-} ## end sub parse_Positionen
 
 
 1;

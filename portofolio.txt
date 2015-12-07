@@ -131,7 +131,7 @@
 0x02299 = %s %s %s %s
 
 # Modul schreibe_Ausgabe
-0x02501 = Schreibe Ausgabe für Depot <%s> nach Datei <%s>
+0x02501 = Schreibe Ausgabedatei <%s>
 
 # Benutzedefinierte Meldungen
 # 0x10000-0xfffff

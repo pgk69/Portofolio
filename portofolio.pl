@@ -14,10 +14,15 @@ eval 'exec perl -wS $0 ${1+"$@"}'
 
 # Letzte Aenderung: 
 
+#TODO:
+#  - Colorierung
+#  - Sortierung
+
 use utf8;      # so literals and identifiers can be in UTF-8
-use v5.12;     # or later to get "unicode_strings" feature
+use v5.16;     # or later to get "unicode_strings" feature
 use strict;    # quote strings, declare variables
 use warnings  qw(FATAL utf8);    # fatalize encoding glitches
+no warnings 'redefine';
  
 use open      qw(:std :utf8);    # undeclared streams in UTF-8
 #use charnames qw(:full :short);  # unneeded in v5.16
@@ -128,7 +133,7 @@ $prg->Flags_laden();
 $prg->Portofolios_lesen(CmdLine->argument());
 
 $prg->Cash_extrahieren();
-$prg->Gesamtliste_erzeugen() if ($prg->{Gesamtliste});
+$prg->Gesamtliste_erzeugen();
 $prg->Positionen_parsen();
 
 $prg->Wechselkurse_lesen();
