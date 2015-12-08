@@ -1197,7 +1197,7 @@ sub Portofolios_summieren {
         # Dividendeninfos falls vorhanden aus Kurs holen andernfalls aus ini
         $posptr->{Dividend}            = $kurs{Dividend} if defined($kurs{Dividend});
         $posptr->{Dividend_Pos}        = $posptr->{Quantity} * $posptr->{Dividend};
-        $posptr->{Dividend_Date}       = defined($kurs{Dividend_Date}) ? $kurs{Dividend_Date} : '';
+        $posptr->{Dividend_Date}       = $kurs{Dividend_Date} if defined($kurs{Dividend_Date});
         
         # Aufsummieren der Werte fuer die Gesamtsumme pro Portofolio
         $self->{Portofolios}{$PFName}{Summe}{Price_Buy_Pos}  += $posptr->{Price_Buy_Pos};
