@@ -1317,9 +1317,9 @@ sub Portofolios_analysieren {
         $posptr->{Change_Day_Percent}   = $posptr->{Price_Last_Pos} ? 100 * $posptr->{Change_Day_Pos} / $posptr->{Price_Last_Pos} : 0;
       }
       $posptr->{Change_Day_Percent}     =~ s/%$// if (defined($posptr->{Change_Day_Percent}));
-      $posptr->{Weight_Dep}             = $self->{Portofolios}{$depot}{Summe}{Price_Pos} ? 100 * $posptr->{Price_Pos} / $self->{Portofolios}{$depot}{Summe}{Price_Pos} : 0;
-      $posptr->{Change_Percent_Dep}     = $self->{Portofolios}{$depot}{Summe}{Price_Pos} ? 100 * $posptr->{Change_Pos} / $self->{Portofolios}{$depot}{Summe}{Price_Pos} : 0;
-      $posptr->{Change_Day_Percent_Dep} = $self->{Portofolios}{$depot}{Summe}{Price_Pos} ? 100 * $posptr->{Change_Day_Pos} / $self->{Portofolios}{$depot}{Summe}{Price_Pos} : 0;
+      $posptr->{Weight_Dep}             = $self->{Portofolios}{$depot}{Summe}{Price_Pos} ? 100  * $posptr->{Price_Pos} / $self->{Portofolios}{$depot}{Summe}{Price_Pos} : 0;
+      $posptr->{Change_Percent_Dep}     = $self->{Portofolios}{$depot}{Summe}{Price_Pos} ? 1000 * $posptr->{Change_Pos} / $self->{Portofolios}{$depot}{Summe}{Price_Pos} : 0;
+      $posptr->{Change_Day_Percent_Dep} = $self->{Portofolios}{$depot}{Summe}{Price_Pos} ? 1000 * $posptr->{Change_Day_Pos} / $self->{Portofolios}{$depot}{Summe}{Price_Pos} : 0;
 
       # Position bewerten
       foreach my $attribute (keys %{$posptr}) {
