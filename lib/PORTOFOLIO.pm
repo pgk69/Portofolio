@@ -1198,7 +1198,15 @@ sub Portofolios_summieren {
         $posptr->{Dividend}            = $kurs{Dividend} if defined($kurs{Dividend});
         $posptr->{Dividend_Pos}        = $posptr->{Quantity} * $posptr->{Dividend};
         $posptr->{Dividend_Date}       = $kurs{Dividend_Date} if defined($kurs{Dividend_Date});
-        $posptr->{Dividend_Date}       = "01/01/00" if !$posptr->{Dividend_Date};
+        $posptr->{Dividend_Date}       = "01/01/2000" if !$posptr->{Dividend_Date};
+        $posptr->{Dividend_Date_TS}    = str2time($posptr->{Dividend_Date}) || 0;
+        $posptr->{Dividend_Days}       = $posptr->{Dividend_Date_TS} - time();
+        $posptr->{Dividend_Days}       = ($posptr->{Dividend_Date_TS} - time)/86400 + 3650;
+        if ($posptr->{Dividend_Days} > 0) {
+          $posptr->{Dividend_Days}     %= 365;
+        } else {
+          $posptr->{Dividend_Days}     = 0;
+        }
         
         # Aufsummieren der Werte fuer die Gesamtsumme pro Portofolio
         $self->{Portofolios}{$PFName}{Summe}{Price_Buy_Pos}  += $posptr->{Price_Buy_Pos};
