@@ -38,52 +38,105 @@ Depot            = ~/.portofolio/$Depot$.txt
 Export           = ~/Work/PORTOFOLIO/$Depot$.csv
 Cash             = ~/Work/PORTOFOLIO/Cash.csv
 
-  # Konsolensteuerung (Farbe):
+# Verfuegbare Parameter
+# Konsolensteuerung (Farbe):
 
-  # Zur Steuerung koennen alle unter [Color] definierten Werte verwendet werden
-  # (normal, invers, clear, pp, p, neutral, n, mm)
-  # Zusaetzlich koennen Shortcuts verwendet werden:
+# Zur Steuerung koennen alle unter [Color] definierten Werte verwendet werden
+# (normal, invers, clear, pp, p, neutral, n, mm)
+# Zusaetzlich koennen Shortcuts verwendet werden (Kurzversion - Langversion):
+
+# C - clear                   : Clearscreen
+
+# Back- and Foreground
+# R - reset                   : Ruecksetzen der Fordergrund- und Hintergrundfarbe
+
+# Background
+# N_C - normal                  : Normaler Hintergrund
+# I_C - invers                  : Invertierter den Hintergrund
+# B_C                           : Aktueller Background, normal oder invers
+
+# Foreground anhaengig von Rating des auszugebenden Wertes (pp, p, neutral, m oder mm)
+# W                           : Prozentuale Aenderung der Position seit Kauf bezogen auf den Kaufkurs
+# WP                          : Prozentuale Aenderung des Portofoilis seit Kauf bezogen auf den aktuellen Kurs des gesamten Portofolios
+# D                           : Prozentuale Tagesaenderung bezogen auf den Vortageskurs
+# DP                          : Prozentuale Tagesaenderung des Portofolios bezogen auf den Vortageskurs des gesamten Portofolios
+# P                           : Portion am Gesamtvermoegen
+# Y                           : Dividend
+# L                           : Letzter Kurs veraltet
+
+# Verfuegbare Werte fuer Einzelpositionen und Portofolios
+# Name        Bereich: (S)umme, (D)epot, (E)xport, (C)ash      Beschreibung
+#
+# Depot                  CEDS : C:Inhaber ED-Head/S-Data:Depotname
+# Position               CEDS : C-Head:Inhaber  C-Data:Inhaber/Bank/Waehrung/Kontostand  ED-Head:Depotname S-Data:Position
+# Name                        : Name der Position
+# WKN                         : WKN der Position
+# Symbol                      : Kurzsymbol der Position
+# Symbol_Local                : Symbol der Position mit Handalsplatz
+# Symbols_Local               : List of local alternative Symbols
+# Branche                     : Branche
+# Quantity                    : Amount of Shares in Position
+# Weight_Dep              EDS : Weight of the Position in the Portofolio ED-Head/S-Data
+# Price                       : Aktueller Preis per Share
+# Price_Pos               EDS : Aktueller Preis der Position ED-Head/S-Data
+# Price_Last                  : Letzter Preis per Share
+# Price_Last_Pos          EDS : Letzter Preis der Position ED-Head/S-Data
+# Price_Buy                   : Kaufpreis per Share
+# Price_Buy_Pos           EDS : Kaufpreis der Position ED-Head/S-Data
+# Change                      : Absolute Veraenderung per Share seit Kauf
+# Change_Pos              EDS : Absolute Veraenderung der Position seit Kauf ED-Head/S-Data
+# Change_Percent          EDS : Prozentuale Veraenderung seit Kauf ED-Head/S-Data
+# Change_Percent_Dep      EDS : Prozentuale Aenderung des Portofoilis seit Kauf bezogen auf den aktuellen Kurs des gesamten Portofolios ED-Head/S-Data
+# Change_Day                  : Absolute Veraenderung per Share am aktuellen Tag
+# Change_Day_Pos          EDS : Absolute Veraenderung der Position am aktuellen Tag ED-Head/S-Data
+# Change_Day_Percent      EDS : Prozentuale Veraenderung am aktuellen Tag ED-Head/S-Data
+# Change_Day_Percent_Dep  EDS : Prozentuale Tagesaenderung des Portofolios bezogen auf den Vortageskurs des gesamten Portofolios ED-Head/S-Data
+# Currency                    : Waehrung der Position
+# Dividend                    : Dividend per Share
+# Dividend_Pos            EDS : Absolute Dividend in Position ED-Head/S-Data
+# Dividend_Date               : Datum der Dividendnausschuettung
+# Dividend_Yield          EDS : Prozentuale Dividend bezogen auf den aktuellen Wert ED-Head/S-Data
+# Dividend_Currency           : Waehrung der Dividendnausschuettung
+# Last_Trade                  : Zeitpunkt des letzter Handels
+# Last_Trade_Date             : Datum des letzter Handels
+# Last_Trade_Time             : Uhrzeit des letzter Handels
+# Last_Trade_TS               : Timestamp des letzter Handels
+# Last_Trade_Days_ago         : Wieviele Tage liegt der letzte Handel zurück
+# letzter_Abruf               : Timestamp der letzten Kursermittelung
+# Stock_Exchange              : Handelsplatz
+# aktuell                     : Flag, das anzeigt, ob der Kurs aktuell ist
+# Owner                  C    : Kontoinhaber C:Head only
+# Bank                   C    : Kontofuehrende Bank
+# Account_Currency       C    : Kontowaehrung
+# Balance                C    : Kontostand
   
-  # C - clear  : Clearscreen
-
-  # Back- and Foreground
-  # R - reset  : Ruecksetzen der Fordergrund- und Hintergrundfarbe
-
-  # Background
-  # N - normal : Normaler Hintergrund
-  # I - invers : Invertierter den Hintergrund
-  # B          : Aktueller Background, normal oder invers
-
-  # Foreground anhaengig von dem auszugebenden Wert pp, p, neutral, m oder mm
-  # W : Aenderung seit Kauf
-  # D : Tagesaenderung
-  # P : Portion am Gesamtvermoegen
-  # Y : Dividende
-  # L : Letzter Kurs veraltet
 [Ausgabeformat_Summe]
-Head = $W$Summe  $D$$TAG$.$MONAT$.$JAHR$ $STUNDE$:$MINUTE$: $Change_Day_Percent%5.2f$%  $Change_Day%8.2f$€ $W$Kaufwert: $Price_Buy%9.2f$€ aktueller Wert: $Price%9.2f$€ Aenderung: $Change%9.2f$€ ($Change_Percent%.2f$%) Dividende: $Dividende%5.2f$€ ($Dividende_Percent%.2f$%)$R$
-Col  = Name                           | Preis       |  Diff %             € | EK-Preis          Diff. €       % |  Anteil |  Div %          € 
-Sep  = -------------------------------+-------------+-----------------------+-----------------------------------+---------+------------------
-Data = $B$$W$$Position%-30.30s$$N$ |$D$ $Price%10.2f$€ $N$| $Change_Day_Percent%6.2f$% $Change_Day%12.2f$€ $N$|$W$ $Price_Buy%10.2f$€ $Change%12.2f$€ $Change_Percent%6.2f$% $N$| $P$$Portion%5.2f$% $N$| $W$$Dividende_Percent%5.2f$% $Dividende%9.2f$€ $R$
+Color = 1
+Head = $Change_Percent_C$Summe$N_C$ $Change_Day_Percent_C$$TAG$.$MONAT$.$JAHR$ $STUNDE$:$MINUTE$: $Change_Day_Percent%5.2f$%  $Change_Day_Pos%7.2f$€$N_C$  $Change_Percent_C$Kaufwert: $Price_Buy_Pos%9.2f$€  aktueller Wert: $Price_Pos%9.2f$€  Aenderung: $Change_Pos%8.2f$€ ($Change_Percent%.2f$%)$N_C$  $Dividend_Yield_C$Dividend: $Dividend_Pos%5.2f$€ ($Dividend_Yield%.2f$%)
+Col  = Name                           |       Preis |  Diff %    Dep ‰             € |    EK-Preis   Diff. %             €    Dep ‰  |  Anteil |  Div %          € 
+Sep  = -------------------------------+-------------+--------------------------------+-----------------------------------------------+----------+------------------
+Data = $Change_Percent_C$$Position%-30.30s$$N_C$ | $Price_Pos%10.2f$€ $N_C$| $Change_Day_Percent_C$$Change_Day_Percent%6.2f$% $Change_Day_Percent_Dep_C$$Change_Day_Percent_Dep%7.2f$‰ $Change_Day_Pos%12.2f$€ $N_C$|$Change_Percent_C$ $Price_Buy_Pos%10.2f$€ $Change_Percent%8.2f$% $Change_Pos%12.2f$€ $Change_Percent_Dep_C$$Change_Percent_Dep%7.2f$‰  $N_C$| $Weight_Dep_C$$Weight_Dep%6.2f$% $N_C$| $Change_Percent_C$$Dividend_Yield_C%5.2f$% $Dividend_Pos%9.2f$€
 
 [Ausgabeformat_Depot]
-Head = $W$$Portofolio%-20.20s$ $D$$TAG$.$MONAT$.$JAHR$ $STUNDE$:$MINUTE$: $Change_Day_Percent%5.2f$%  $Change_Day%7.2f$€  $W$Kaufwert: $Price_Buy%9.2f$€  aktueller Wert: $Price%9.2f$€  Aenderung: $Change%8.2f$€ ($Change_Percent%.2f$%)  Dividende: $Dividende%5.2f$€ ($Dividende_Percent%.2f$%)$R$
-Col  = Name                 Symbol       Quelle     |    Preis   Diff %        €         ∑       Pos ∑ | Anzahl | EK-Preis  Diff. %          €           ∑ | Anteil |  Div %        €          ∑  | Letzter Handel$R$
-Sep  = ---------------------------------------------+--------------------------------------------------+--------+------------------------------------------+--------+-----------------------------+---------------
-Data = $B$$W$$name%-20.20s$ $symbol%-12.12s$ $exchange%-10.10s$ $N$| $D$$last%7.2f$€ $p_change%7.2f$% $net%7.2f$€ $Change_Day%8.2f$€ $Price%10.2f$€ $N$| $Quantity%6.6s$ $N$| $W$$Price_Buy_Share%7.2f$€ $Change_Percent%7.2f$% $Change%9.2f$€ $Price_Buy%10.2f$€ $N$| $P$$Portion%5.2f$% $N$| $Y$$Dividende_Percent%5.2f$% $Dividende_Share%7.2f$€ $Dividende%10.2f$€ $N$| $L$$_Tradetime$$R$
+Color = 1
+Head = $Change_Percent_C$$Depot%-20.20s$$N_C$ $Change_Day_Percent_C$$TAG$.$MONAT$.$JAHR$ $STUNDE$:$MINUTE$: $Change_Day_Percent%5.2f$%  $Change_Day_Pos%7.2f$€$N_C$  $Change_Percent_C$Kaufwert: $Price_Buy_Pos%9.2f$€  aktueller Wert: $Price_Pos%9.2f$€  Aenderung: $Change_Pos%8.2f$€ ($Change_Percent%.2f$%)$N_C$  $Dividend_Yield_C$Dividend: $Dividend_Pos%5.2f$€ ($Dividend_Yield%.2f$%)
+Col  = Name                 WKN    Src |    Preis   Diff %        €         ∑    Dep ‰       Pos ∑ | Anzahl | EK-Preis  Diff. %          €    Dep ‰           ∑ | Anteil |  Div %        €           ∑ Days |   Last Trade
+Sep  = --------------------------------+-----------------------------------------------------------+--------+---------------------------------------------------+--------+----------------------------------+-------------
+Data = $Change_Percent_C$$Name%-20.20s$ $WKN%-6.6s$ $Stock_Exchange%-3.3s$ $N_C$| $Change_Day_Percent_C$$Price%7.2f$€ $Change_Day_Percent%7.2f$% $Change_Day%7.2f$€ $Change_Day_Pos%8.2f$€ $Change_Day_Percent_Dep_C$$Change_Day_Percent_Dep%7.2f$‰ $Price_Pos%10.2f$€ $N_C$| $Quantity%6.6s$ | $Change_Percent_C$$Price_Buy%7.2f$€ $Change_Percent%7.2f$% $Change_Pos%9.2f$€ $Change_Percent_Dep_C$$Change_Percent_Dep%7.2f$‰ $Price_Buy_Pos%10.2f$€ $N_C$| $Weight_Dep_C$$Weight_Dep%5.2f$% $N_C$| $Dividend_Yield_C$$Dividend_Yield%5.2f$% $Dividend%7.2f$€ $Dividend_Pos%10.2f$€ $Dividend_Days_C$$Dividend_Days%4s$ $N_C$| $Last_Trade_Days_ago_C$$Last_Trade_Days_ago%3s$ days ago
+#Data = $Change_Percent_C$$Name%-20.20s$ $WKN%-6.6s$ $Stock_Exchange%-3.3s$ $N_C$| $Change_Day_Percent_C$$Price%7.2f$€ $Change_Day_Percent%7.2f$% $Change_Day%7.2f$€ $Change_Day_Pos%8.2f$€ $Change_Day_Percent_Dep_C$$Change_Day_Percent_Dep%7.2f$‰ $Price_Pos%10.2f$€ $N_C$| $Quantity%6.6s$ | $Change_Percent_C$$Price_Buy%7.2f$€ $Change_Percent%7.2f$% $Change_Pos%9.2f$€ $Change_Percent_Dep_C$$Change_Percent_Dep%7.2f$‰ $Price_Buy_Pos%10.2f$€ $N_C$| $Weight_Dep_C$$Weight_Dep%5.2f$% $N_C$| $Dividend_Yield_C$$Dividend_Yield%5.2f$% $Dividend%7.2f$€ $Dividend_Pos%10.2f$€ $Dividend_Days_C$$Dividend_Days%4s$ $Dividend_Date$ $N_C$| $Last_Trade_Days_ago_C$$Last_Trade_Days_ago%3s$ days ago
 
 [Ausgabeformat_Export]
-Data = $name$$\x09$$last_RAW%.2f$$\x09$$_Waehrung$$\x09$$last%.2f$$\x09$$Quantity$$\x09$$Price_Buy%.2f$$\x09$$Symbol$$\x09$$Dividende_Share%.2f$$\x09$$Branche$
+Data = $Name$$\x09$$Price_Last%.2f$$\x09$$Currency$$\x09$$Price%.2f$$\x09$$Quantity$$\x09$$Price_Buy_Pos%.2f$$\x09$$Symbols_Local$$\x09$$Dividend%.2f$$\x09$$Branche$
 
 [Ausgabeformat_Cash]
-Data = $Inhaber$$\x09$$Bank$$\x09$$KtoWaehrung$$\x09$$KtoStand%.2f$
+Data = $Owner$$\x09$$Bank$$\x09$$Currency_Account$$\x09$$Balance%.2f$
 
 [Stockservice Yahoo]
 Anzahl_Versuche  = 10
 URL              = http://download.finance.yahoo.com/d/quotes.csv?s=$STOCK$&f=$DATA$&e=.csv
 
 [Stockservice Finance::Quote]
-Markets          = fidelity vwd europe 
+Markets          = fidelity vwd europe usa nyse nasdaq australia canada tiaacref troweprice uk_unit_trusts vanguard
 # Markets          = fidelity dwsfunds usa nyse nasdaq australia canada tiaacref troweprice uk_unit_trusts vanguard europe vwd
 
 [Stockservice]
@@ -93,51 +146,78 @@ UTCDelta         = 7200
 # nsxbc1p2ydd1t1
 # Name Symbol Stock_Exchange Bid Change Change_Percent Dividend_Yield Last_Trade_Date Last_Trade_Time
 
-# Variablenname = Kurzname(Abbr) Beschreibung(Flag) Faktor Laenge Default Format
+## Pricing
+#Info last      = l1 Last_Trade_Price 1 7 0 %7.2f
+#Info net       = c1 Change 1 7 0 %+7.2f
+#Info p_change  = p2 Change_Percent 0 5 0 %+5.2f
+#
+## Dividends
+#Info div_yield = y Dividend_Yield 0 6 0 %5.2f
+#Info div       = d Dividend_per_Share 1 5 0 %6.2f
+#
+## Date
+#Info date      = d1 Last_Trade_Date 0 10 - %10s
+#Info time      = t1 Last_Trade_Time 0 10 - %7s
+#
+## Symbol Info
+#Info name      = n Name 0 20 - %-20s
+#Info symbol    = s Symbol 0 12 - %-12s
+#Info exchange  = x Stock_Exchange 0 10 - %-10s
 
-# Pricing
-Info last      = l1 Last_Trade_Price 2 7 0 %7.2f
-Info net       = c1 Change 2 - 0 %+7.2f
-Info p_change  = p2 Change_Percent 2 5 0 %+5.2f
-
-# Dividends
-Info div_yield = y Dividend_Yield 0 6 0 %5.2f
-Info div       = d Dividend_per_Share 1 5 0 %6.2f
-
-# Date
-Info date      = d1 Last_Trade_Date 0 10 - %10s
-Info time      = t1 Last_Trade_Time 0 10 - %7s
+# Info Variablenname = Kurzname(Yahoo) Kurzname(Quote) Faktor Laenge Default Format
+# Info Variablenname = Kurzname(Yahoo) Kurzname(Quote) Faktor Format Default
 
 # Symbol Info
-Info name      = n Name 0 20 - %-20s
-Info symbol    = s Symbol 0 12 - %-12s
-Info exchange  = x Stock_Exchange 0 10 - %-10s
+Info Name                 = n name 0 %-20s
+Info Symbol               = s symbol 0 %-12s
+Info Symbol_Local         =
+Info Branche              =
+Info Stock_Exchange       = x exchange 0 %-10s
 
-# Several others (generic)
-Info Branche            =
-Info Change_Day_Percent =
-Info Dividende_Percent  =
-Info Dividende_share    =
-Info Price_Buy_Share    =
-Info Price_Share        =
-Info _Tradetime         =
-Info _Waehrung          =
-Info _aktuell           =
-Info _last              =
-Info _lastTrade         =
-Info _letzter_Abruf     =
-Info _tradetime         =
-Info dir_RAW            =
-Info last_RAW           =
-Info net_RAW            =
+# Pricing
+Info Price                = l1 last 0 %7.2f
+Info Price_Buy            =
+Info Change_Day           = c1 net 0 %+7.2f
+Info Change_Day_Percent   = p2 p_change 0 %+5.2f
+Info Change               =
+Info Change_Percent       =
+Info Currency             = - currency
+
+# Dividends
+Info Dividend_Yield       = y div_yield 0 %5.2f
+Info Dividend             = d div 0 %6.2f
+Info Dividend_Date        = - div_date
+Info Dividend_Currency    = - currency
+
+# Date
+Info Last_Trade_Date      = d1 date 0 %10s
+Info Last_Trade_Time      = t1 time 0 %7s
+Info Last_Trade_TS        =
+Info Last_Trade           =
+Info aktuell              = - - - - 0
+Info letzter_Abruf        =
+
+# Summary
+Info Quantity             =
 
 # Only for Depotvalues
 # Info Change             =
 # Info Change_Day         =
 # Info Div_Summe          =
-# Info Dividende          =
+# Info Dividend          =
 # Info Portion            =
 # Info Price              =
 # Info Price_Buy          =
 # Info Price_Last         =
 # Info Quantity           =
+
+[Rating]
+# Erzeugt einen neuen Value R_<Ratingvalue> pp, p, neutral, p, pp je nach Value
+Last_Trade_Days_ago    = desc 10 7 2 0
+Change_Percent         = asc -10 -5 5 10
+Change_Percent_Dep     = asc -10 -5 5 10
+Change_Day_Percent     = asc -2 -1 1 2
+Change_Day_Percent_Dep = asc -1 -0.5 0.5 1
+Weight_Dep             = range 1 3 6 10
+Dividend_Yield         = asc 1 2 3 4
+Dividend_Days          = asc 30 90 120 150
