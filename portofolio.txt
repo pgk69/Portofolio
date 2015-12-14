@@ -84,6 +84,7 @@
 
 0x02000 = Altes Lockfile gelöscht (%s).
 0x02001 = Lockfile <%s> angelegt.
+0x02002 = Basiswaehrung <%s> existiert nicht. Fallback auf EUR als Basiswaehrung.
 
 0x0a000 = Programm <%s> kann nicht mehrfach gestartet werden (%s existiert bereits)!
 
@@ -130,7 +131,7 @@
 0x02299 = %s %s %s %s
 
 # Modul schreibe_Ausgabe
-0x02501 = Schreibe Ausgabe für Depot <%s> nach Datei <%s>
+0x02501 = Schreibe Ausgabedatei <%s>
 
 # Benutzedefinierte Meldungen
 # 0x10000-0xfffff

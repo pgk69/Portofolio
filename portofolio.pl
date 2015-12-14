@@ -14,10 +14,15 @@ eval 'exec perl -wS $0 ${1+"$@"}'
 
 # Letzte Aenderung: 
 
+#TODO:
+#  - Colorierung
+#  - Sortierung
+
 use utf8;      # so literals and identifiers can be in UTF-8
-use v5.12;     # or later to get "unicode_strings" feature
+use v5.16;     # or later to get "unicode_strings" feature
 use strict;    # quote strings, declare variables
 use warnings  qw(FATAL utf8);    # fatalize encoding glitches
+no warnings 'redefine';
  
 use open      qw(:std :utf8);    # undeclared streams in UTF-8
 #use charnames qw(:full :short);  # unneeded in v5.16
@@ -104,16 +109,40 @@ if ($@) {
 
 #-------------------------------------------------------------------------------
 # PRGRAMM-Start
+# 1.) Beim Parsen der Portofolios BKN.DE|BNS|BNS.TO splitten nach "|", sortier-
+#     en vom ersten Wert Alles vor dem Komma als Symbol verwenden.
+#     Der Key ist "BKN 1".
+#     Im Inhalt ist ein Feld Symbol_Local mit "BKN.DE|BNS|BNS.TO"
+# 2.) Für alle gefundenen lokalen Symbole einen Kurseintrag anlegen mit dem
+#     lokalen Symbol als key.
+#       {BKN.DE}
+#       {BNS.TO}
+#       {BNS}
+# 3.) Für alle Kurse die Werte holen
+# 4.) Für alle Portofoliopositionen den enstprechenden Kurs Eintrag suchen
+#       - Key des Kurses ist ein Symbol_lokal der Portofolioposition
+#       - Währung is identisch
+# 5.) Falls es Im Kurs Dividende und Dividenden Währung gibt, übernehmen
+#     und Werte aus Portofolio überschreiben
+# 6.) Alle Positionen umrechnen in die Basiswährung
+# 7.) Ggf. aufsummieren und ausgeben
+#        
+#     
 #-------------------------------------------------------------------------------
-$prg->lese_Portofolios(CmdLine->argument());
-$prg->extract_Cash();
-$prg->erzeuge_Gesamtliste() if ($prg->{Gesamtliste});
-$prg->parse_Positionen();
-$prg->ergaenze_Wechselkurse();
+$prg->Flags_laden();
+$prg->Portofolios_lesen(CmdLine->argument());
 
+$prg->Cash_extrahieren();
+$prg->Gesamtliste_erzeugen();
+$prg->Positionen_parsen();
+
+$prg->Wechselkurse_lesen();
 $prg->Kurse_ermitteln();
-$prg->analysiere_Portofolios();
-$prg->schreibe_Ausgabe();
+
+$prg->Kurse_umrechnen();
+$prg->Portofolios_summieren() if ($prg->{SumPos});
+$prg->Portofolios_analysieren();
+$prg->Ausgabe_schreiben();
 
 $prg->Exit(0, 1, 0x00002, $prg->prg, $VERSION);
 
