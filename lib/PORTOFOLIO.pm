@@ -13,7 +13,7 @@ package PORTOFOLIO;
 
 # use utf8;      # so literals and identifiers can be in UTF-8
 # use v5.12;     # or later to get "unicode_strings" feature
-# use strict;    # quote strings, declare variables
+use strict;    # quote strings, declare variables
 # use warnings;  # on by default
 # use warnings  qw(FATAL utf8);    # fatalize encoding glitches
 use open qw(:utf8 :std);    # undeclared streams in UTF-8
@@ -459,7 +459,7 @@ sub _webabruf_QUOTE {
   }
 
   my $quoter = Finance::Quote->new();
-  $quoter->set_currency(EUR);  # Set default currency.
+  $quoter->set_currency('EUR');  # Set default currency.
     
   foreach my $quelle (@markets) {
     Trace->Trc('I', 2, 0x02105, $quelle);
@@ -1370,7 +1370,7 @@ sub schreibe_Ausgabe {
 
   # Abarbeitung aller Portofolios
   foreach my $depot (keys %{$self->{Portofolios}}) {
-    foreach $ausgabe (keys %ausgabedatei) {
+    foreach my $ausgabe (keys %ausgabedatei) {
       next if ($ausgabe eq 'Cash');                           # Hier werden nur Portofolios behandelt
       next if (($depot eq 'Summe') && ($ausgabe ne 'Summe')); # Depot Summe wird nur auf Ausgabe Summe geschrieben
       next if (($depot ne 'Summe') && ($ausgabe eq 'Summe')); # und sonst nichts
@@ -1385,7 +1385,7 @@ sub schreibe_Ausgabe {
 
   # Abarbeitung der Cashliste
   foreach my $owner (keys %{$self->{Cash}}) {
-    foreach $ausgabe (keys %ausgabedatei) {
+    foreach my $ausgabe (keys %ausgabedatei) {
       next if ($ausgabe ne 'Cash');                           # Hier wird nur Cash behandelt
       Trace->Trc('I', 2, "Erzeuge Ausgabe fuer <$ausgabe>  Inhaber: <$owner>  Datei: <$ausgabedatei{$ausgabe}>.");
       $self->_push('Cash', $ausgabe, $owner, 'Head');
