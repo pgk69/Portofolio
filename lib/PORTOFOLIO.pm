@@ -310,17 +310,17 @@ sub _webabruf_YAHOO {
   foreach (sort keys %{$self->{Kurs}}) {
     my @symbols = split('\|', $_);
     my $kursptr = $self->{Kurs}{$_};
-    while ((my $symbol = shift(@symbols)) && !($$kursptr{last})) {
+    while ((my $symbol = shift(@symbols)) && !($kursptr->{last})) {
       # Fuer jedes Symbol den Abruf machen sofern noch kein Kurs feststeht
       Trace->Trc('I', 2, 0x02104, $symbol);
-      if (!$$kursptr{_aktuell} && (!$$kursptr{_letzter_Abruf} || ($$kursptr{_letzter_Abruf} < time - $self->{MaxDelay}))) {
+      if (!$kursptr->{_aktuell} && (!$kursptr->{_letzter_Abruf} || ($kursptr->{_letzter_Abruf} < time - $self->{MaxDelay}))) {
         my $webAbruf = Utils::extendString(Configuration->config('Stockservice Yahoo', 'URL'), 'STOCK|' . $symbol . '|DATA|' . join('', @flags));
         my $maxtry = Configuration->config('Stockservice Yahoo', 'Anzahl_Versuche') || 10;
 
         my $crlfmerker = $/;
         $/ = '%';
 
-        $$kursptr{_aktuell} = 0;
+        $kursptr->{_aktuell} = 0;
         do {
           my $stockdata = get($webAbruf);
           if (defined($stockdata) && $stockdata !~ 'Missing') {
@@ -334,31 +334,31 @@ sub _webabruf_YAHOO {
               if (defined($flag) && $flag ne '-') {
                 # Sichern des Originalwertes
                 if ($self->{Flags}{$flagname}{Faktor}) {
-                  $$kursptr{$flagname . '_RAW'} = $wert
+                  $kursptr->{$flagname . '_RAW'} = $wert
                 }
-                if ($self->{Flags}{$flagname}{Faktor} && $$kursptr{_Waehrung}) {
+                if ($self->{Flags}{$flagname}{Faktor} && $kursptr->{_Waehrung}) {
                   if ($self->{Flags}{$flagname}{Faktor} == 1) {
-                    my $curxchg = $self->{BasisCur} . $$kursptr{_Waehrung} . '=X';
+                    my $curxchg = $self->{BasisCur} . $kursptr->{_Waehrung} . '=X';
                     # Falls der Wechselkurs fuer die Waehrung noch nicht ermittelt ist,
                     # versuchen wir das
                     if (!$self->{Kurs}{$curxchg}{last}) {
                       # Default -> Wechselkurs 1
                       $self->{Kurs}{$curxchg}{last} = 1;
-                      if ($$kursptr{_Waehrung} ne $self->{BasisCur}) {
-                        if ($$kursptr{_Waehrung} =~ /^[0-9.,]+/) {
+                      if ($kursptr->{_Waehrung} ne $self->{BasisCur}) {
+                        if ($kursptr->{_Waehrung} =~ /^[0-9.,]+/) {
                           # Keine Standardwaehrung -> Wechselkurs wird direkt angegeben
-                          $self->{Kurs}{$curxchg}{last} = $$kursptr{_Waehrung};
-                        } elsif ($$kursptr{_Waehrung} =~ /^[A-Za-z][A-Za-z0-9]{2}/) {
+                          $self->{Kurs}{$curxchg}{last} = $kursptr->{_Waehrung};
+                        } elsif ($kursptr->{_Waehrung} =~ /^[A-Za-z][A-Za-z0-9]{2}/) {
                           # Standardwaehrung -> Wechselkurs wird ermittelt
                           $self->_webabruf_YAHOO($curxchg, $self->{Kurs}{$curxchg});
                           # Normalisieren des Wertes
                           $self->{Kurs}{$curxchg}{last} *= 1;
                           # Fuer GBP ist ein weiterer Faktor 100 noetig
-                          $self->{Kurs}{$curxchg}{last} *= 100 if ($$kursptr{_Waehrung} eq 'GBP');
+                          $self->{Kurs}{$curxchg}{last} *= 100 if ($kursptr->{_Waehrung} eq 'GBP');
                         }
-                      } ## end if ($$kursptr{_Waehrung...})
+                      } ## end if ($kursptr->{_Waehrung...})
                     } ## end if (!$self->{Kurs}{$curxchg...})
-                    $self->{Exchange}{$$kursptr{_Waehrung}} = $self->{Kurs}{$curxchg}{last};
+                    $self->{Exchange}{$kursptr->{_Waehrung}} = $self->{Kurs}{$curxchg}{last};
 
                     # Der Wert in Basiswaehrung wird nur ermittelt, falls ein Wechselkurs existiert
                     $wert = $wert / $self->{Kurs}{$curxchg}{last} if ($self->{Kurs}{$curxchg}{last});
@@ -367,44 +367,44 @@ sub _webabruf_YAHOO {
                   }
                 } ## end if ($self->{Flags}{$flag...})
                 # Sichern des faktorisierten Wertes
-                $$kursptr{$flagname} = ($flagname ne 'symbol') ? $wert : (split(/\./, $wert))[0];
+                $kursptr->{$flagname} = ($flagname ne 'symbol') ? $wert : (split(/\./, $wert))[0];
               } ## end if (defined($flag))
             } ## end while ($stockdata =~ /\"[\s0]*([^\"]+?)[\s]*\"|[\s0]*([^,\s]+)/g)
           } ## end if (defined($stockdata...))
           $maxtry--;
         }
-        until ($maxtry <= 0 || ($$kursptr{last} &&
-                                $$kursptr{last} ne 'N/A' &&
-                                $$kursptr{last} > 0 &&
-                                $$kursptr{last} <= 1000000 &&
-                                $$kursptr{last} != 1));
+        until ($maxtry <= 0 || ($kursptr->{last} &&
+                                $kursptr->{last} ne 'N/A' &&
+                                $kursptr->{last} > 0 &&
+                                $kursptr->{last} <= 1000000 &&
+                                $kursptr->{last} != 1));
 
-        if ($$kursptr{date} && $$kursptr{'time'}) {
-          $$kursptr{Last_Trade_TS} = str2time("$$kursptr{date} $$kursptr{'time'}", $self->{TZ}) || 0;
-          $$kursptr{Last_Trade}    = time2str('%d.%m.%y %R', $$kursptr{Last_Trade_TS});
-          $$kursptr{_lastTrade}    = abs((str2time(time2str('%x', time)) - str2time(time2str('%x', $$kursptr{Last_Trade_TS}))) / 86400);
-          if ($$kursptr{Last_Trade_TS} < str2time(time2str('%x', time))) {
-            # $$kursptr{Last_Trade} .= '<';
-            $$kursptr{_aktuell} = ($$kursptr{_letzter_Abruf} && $$kursptr{_letzter_Abruf} < time - $self->{MaxDelay}) ? 0 : 1;
+        if ($kursptr->{date} && $kursptr->{'time'}) {
+          $kursptr->{Last_Trade_TS} = str2time("$kursptr->{date} $kursptr->{'time'}", $self->{TZ}) || 0;
+          $kursptr->{Last_Trade}    = time2str('%d.%m.%y %R', $kursptr->{Last_Trade_TS});
+          $kursptr->{_lastTrade}    = abs((str2time(time2str('%x', time)) - str2time(time2str('%x', $kursptr->{Last_Trade_TS}))) / 86400);
+          if ($kursptr->{Last_Trade_TS} < str2time(time2str('%x', time))) {
+            # $kursptr->{Last_Trade} .= '<';
+            $kursptr->{_aktuell} = ($kursptr->{_letzter_Abruf} && $kursptr->{_letzter_Abruf} < time - $self->{MaxDelay}) ? 0 : 1;
           } else {
-            $$kursptr{_aktuell} = 1
+            $kursptr->{_aktuell} = 1
           }
-          $$kursptr{_letzter_Abruf} = time;
+          $kursptr->{_letzter_Abruf} = time;
         } else {
-          $$kursptr{Last_Trade} = 0
+          $kursptr->{Last_Trade} = 0
         }
 
-        if ($$kursptr{name}) {
-          $$kursptr{name} =~ s/\s+N$//
+        if ($kursptr->{name}) {
+          $kursptr->{name} =~ s/\s+N$//
         }
 
-        Trace->Trc('I', 2, 0x02102, $symbol, $$kursptr{name}, $$kursptr{last});
+        Trace->Trc('I', 2, 0x02102, $symbol, $kursptr->{name}, $kursptr->{last});
 
         $/ = $crlfmerker;
-      } ## end if (!$$kursptr{_aktuell...})
+      } ## end if (!$kursptr->{_aktuell...})
 
-      if ($$kursptr{_last}) {
-        $$kursptr{last} = $$kursptr{_last}
+      if ($kursptr->{_last}) {
+        $kursptr->{last} = $kursptr->{_last}
       }
 
       # Kursinfos speichern
@@ -486,31 +486,32 @@ sub _webabruf_QUOTE {
           $posval{Last_Trade_TS} = str2time("$posval{Last_Trade_Date} $posval{Last_Trade_Time}") || 0
         }
         
-        if (!defined($$kursptr{Last_Trade_TS}) || ($posval{Last_Trade_TS} > $$kursptr{Last_Trade_TS})) {
-          $$kursptr{aktuell} = 0;
+        if (!defined($kursptr->{Last_Trade_TS}) || ($posval{Last_Trade_TS} > $kursptr->{Last_Trade_TS})) {
+          $kursptr->{aktuell} = 0;
       
           foreach my $flagname (keys(%posval)) {
             if ($flagname eq 'Symbol') {
-              $$kursptr{$flagname} = (split(/\./, $posval{$flagname}))[0];
+              $kursptr->{$flagname} = (split(/\./, $posval{$flagname}))[0];
             } else {
-              $$kursptr{$flagname} = $posval{$flagname};
+              $kursptr->{$flagname} = $posval{$flagname};
             }
           }
       
           if ($posval{Last_Trade_TS}) {
-            $$kursptr{Last_Trade} = time2str('%d.%m.%y %R', $$kursptr{Last_Trade_TS} + $self->{UTCDelta});
-            $$kursptr{Last_Trade_Days_ago} = abs((str2time(time2str('%x', time)) - str2time(time2str('%x', $posval{Last_Trade_TS}))) / 86400);
-            $$kursptr{aktuell} = 1;
-            $$kursptr{letzter_Abruf} = str2time(gmtime());
+            $kursptr->{Last_Trade} = time2str('%d.%m.%y %R', $kursptr->{Last_Trade_TS} + $self->{UTCDelta});
+            $kursptr->{Last_Trade_Days_ago} = abs((str2time(time2str('%x', time)) - str2time(time2str('%x', $posval{Last_Trade_TS}))) / 86400);
+            $kursptr->{aktuell} = 1;
+            $kursptr->{letzter_Abruf} = str2time(gmtime());
           } else {
-            $$kursptr{Last_Trade} = 0
+            $kursptr->{Last_Trade} = 0
           }
       
-          if ($$kursptr{Name}) {$$kursptr{Name} =~ s/\s+N$//}
-          if (!defined($$kursptr{Symbol}) || ($$kursptr{Symbol} eq '')) {$$kursptr{Symbol} = $symbol}
-          if (!defined($$kursptr{Stock_Exchange}) || ($$kursptr{Stock_Exchange} eq '')) {$$kursptr{Stock_Exchange} = $quelle}
+          if ($kursptr->{Name}) {$kursptr->{Name} =~ s/\s+N$//}
+          if (defined($kursptr->{Dividend})) {$kursptr->{Dividend} ||= 0}
+          if (!defined($kursptr->{Symbol}) || ($kursptr->{Symbol} eq '')) {$kursptr->{Symbol} = $symbol}
+          if (!defined($kursptr->{Stock_Exchange}) || ($kursptr->{Stock_Exchange} eq '')) {$kursptr->{Stock_Exchange} = $quelle}
         }
-        Trace->Trc('I', 5, 0x02102, $symbol, $$kursptr{Name}, $$kursptr{Last_Trade_Days_ago});
+        Trace->Trc('I', 5, 0x02102, $symbol, $kursptr->{Name}, $kursptr->{Last_Trade_Days_ago});
       }
     }
   }
@@ -858,7 +859,7 @@ sub Positionen_parsen {
               next;
             }
             $attrHash->{Dividend_Currency} = $attrHash->{Currency};
-            $attrHash->{Quantity}          = $attrArr[1];
+            $attrHash->{Quantity}          = $attrArr[1] || 0;
             $attrHash->{Price_Buy_Pos}     = $attrArr[2];
             $attrHash->{Dividend}          = $attrArr[3] || '0';
             $attrHash->{Branche}           = $attrArr[4] || '';
@@ -1106,10 +1107,10 @@ sub Portofolios_summieren {
   # PW  Currency            : Waehrung der Position
   # PW  Dividend            : Dividende per Share
   # PWS Dividend_Pos        : Absolute Dividende in Position
+  # PW  Last_Trade          : Zeitpunkt des letzter Handels
   # PW  Dividend_Date       : Datum der Dividendenausschuettung
   # PWS Dividend_Yield      : Prozentuale Dividende bezogen auf den aktuellen Wert
   # PW  Dividend_Currency   : Waehrung der Dividendenausschuettung
-  # PW  Last_Trade          : Zeitpunkt des letzter Handels
   # PW  Last_Trade_Date     : Datum des letzter Handels
   # PW  Last_Trade_Time     : Uhrzeit des letzter Handels
   # PW  Last_Trade_TS       : Timestamp des letzter Handels
@@ -1167,7 +1168,7 @@ sub Portofolios_summieren {
         }
         
         # Ergaenzen der Positionsinfos
-        $posptr->{Name}                ||= $kurs{Name};
+        $posptr->{Name}                = $kurs{Name} if defined($kurs{Name});
         if (looks_like_number($posptr->{Quantity}) && $posptr->{Quantity} && looks_like_number($posptr->{Price_Buy_Pos})) {
           $posptr->{Price_Buy} = $posptr->{Price_Buy_Pos} / $posptr->{Quantity};
         } else {
@@ -1196,6 +1197,7 @@ sub Portofolios_summieren {
     
         # Dividendeninfos falls vorhanden aus Kurs holen andernfalls aus ini
         $posptr->{Dividend}            = $kurs{Dividend} if defined($kurs{Dividend});
+        $posptr->{Dividend}            ||= 0;
         $posptr->{Dividend_Pos}        = $posptr->{Quantity} * $posptr->{Dividend};
         $posptr->{Dividend_Date}       = $kurs{Dividend_Date} if defined($kurs{Dividend_Date});
         $posptr->{Dividend_Date}       = "01/01/2000" if !$posptr->{Dividend_Date};
@@ -1513,6 +1515,9 @@ sub Ausgabe_schreiben {
         # Fuer alle Dateien
         if (defined(my $data = Configuration->config("Ausgabeformat_$typ", 'Data'))) {
           Trace->Trc('I', 5, "Bearbeite Ausgabedatei <$typ> Position <$pos>");
+          if ($pos eq "GSK 1") {
+            sleep 1;
+          }
           # Wenn Data dann erzeuge und Schreiben Datastring
           my $count = 1;
           while (defined($self->{Ausgabe}{$name}{Data}{$posname})) {
