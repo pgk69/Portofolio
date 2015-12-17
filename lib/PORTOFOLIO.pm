@@ -1204,7 +1204,7 @@ sub Portofolios_summieren {
         $posptr->{Dividend_Date}       = $kurs{Dividend_Date} if defined($kurs{Dividend_Date});
         $posptr->{Dividend_Date}       = "01/01/2000" if !$posptr->{Dividend_Date};
         $posptr->{Dividend_Date_TS}    = str2time($posptr->{Dividend_Date}) || 0;
-        $posptr->{Dividend_Date}       = time2str('%d.%m.%y %R', $posptr->{Dividend_Date_TS});
+        $posptr->{Dividend_Date}       = time2str('%d.%m.%y', $posptr->{Dividend_Date_TS});
         $posptr->{Dividend_Days}       = $posptr->{Dividend_Date_TS} - time();
         $posptr->{Dividend_Days}       = ($posptr->{Dividend_Date_TS} - time)/86400 + 3650;
         if ($posptr->{Dividend_Days} > 0) {
