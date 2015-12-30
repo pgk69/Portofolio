@@ -1107,10 +1107,12 @@ sub Portofolios_summieren {
   # PW  Currency            : Waehrung der Position
   # PW  Dividend            : Dividende per Share
   # PWS Dividend_Pos        : Absolute Dividende in Position
-  # PW  Last_Trade          : Zeitpunkt des letzter Handels
   # PW  Dividend_Date       : Datum der Dividendenausschuettung
+  # PW  Dividend_Days       : Tage bis zur Dividendenausschuettung
+  # PW  Dividend_Weeks      : Wochen bis zur Dividendenausschuettung
   # PWS Dividend_Yield      : Prozentuale Dividende bezogen auf den aktuellen Wert
   # PW  Dividend_Currency   : Waehrung der Dividendenausschuettung
+  # PW  Last_Trade          : Zeitpunkt des letzter Handels
   # PW  Last_Trade_Date     : Datum des letzter Handels
   # PW  Last_Trade_Time     : Uhrzeit des letzter Handels
   # PW  Last_Trade_TS       : Timestamp des letzter Handels
@@ -1201,13 +1203,20 @@ sub Portofolios_summieren {
         $posptr->{Dividend_Pos}        = $posptr->{Quantity} * $posptr->{Dividend};
         $posptr->{Dividend_Date}       = $kurs{Dividend_Date} if defined($kurs{Dividend_Date});
         $posptr->{Dividend_Date}       = "01/01/2000" if !$posptr->{Dividend_Date};
+        if ($posptr->{Dividend_Date}   =~ m/([0-9]+)\.([0-9]+)\.([0-9]+)$/) {
+          $posptr->{Dividend_Date}     = "$2/$1/$3";
+        }
         $posptr->{Dividend_Date_TS}    = str2time($posptr->{Dividend_Date}) || 0;
+        $posptr->{Dividend_Date}       = time2str('%d.%m.%y', $posptr->{Dividend_Date_TS});
         $posptr->{Dividend_Days}       = $posptr->{Dividend_Date_TS} - time();
         $posptr->{Dividend_Days}       = ($posptr->{Dividend_Date_TS} - time)/86400 + 3650;
-        if ($posptr->{Dividend_Days} > 0) {
+        if ($posptr->{Dividend_Days} >= 0) {
           $posptr->{Dividend_Days}     %= 365;
+          $posptr->{Dividend_Weeks}    = int($posptr->{Dividend_Days}/7);
         } else {
-          $posptr->{Dividend_Days}     = 0;
+          $posptr->{Dividend_Days}     = '';
+          $posptr->{Dividend_Weeks}    = '';
+          $posptr->{Dividend_Date}     = '';
         }
         
         # Aufsummieren der Werte fuer die Gesamtsumme pro Portofolio
@@ -1515,9 +1524,6 @@ sub Ausgabe_schreiben {
         # Fuer alle Dateien
         if (defined(my $data = Configuration->config("Ausgabeformat_$typ", 'Data'))) {
           Trace->Trc('I', 5, "Bearbeite Ausgabedatei <$typ> Position <$pos>");
-          if ($pos eq "GSK 1") {
-            sleep 1;
-          }
           # Wenn Data dann erzeuge und Schreiben Datastring
           my $count = 1;
           while (defined($self->{Ausgabe}{$name}{Data}{$posname})) {
