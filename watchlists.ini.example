@@ -1,2 +1,2 @@
 [Watchlist Archiv]
-ABX.TO               = {"Currency":"CAD", "Quantity":300,   "Price_Buy":10433.2,  "Dividende_Share":0.123, "Dividende_Currency":"GBP", "Branche":"Rohstoff",       "WKN":null,     "Name":"BARRICK GOLD CORP."}
+ABX.TO               = {"Currency":"CAD", "Quantity":300,   "Price_Buy":10433.2,  "Dividend_Share":0.123, "Dividende_Currency":"GBP", "Branche":"Rohstoff",       "WKN":null,     "Name":"BARRICK GOLD CORP."}
