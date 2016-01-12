@@ -1107,12 +1107,12 @@ sub Portofolios_summieren {
   # PW  Currency            : Waehrung der Position
   # PW  Dividend            : Dividende per Share
   # PWS Dividend_Pos        : Absolute Dividende in Position
+  # PW  Last_Trade          : Zeitpunkt des letzter Handels
   # PW  Dividend_Date       : Datum der Dividendenausschuettung
   # PW  Dividend_Days       : Tage bis zur Dividendenausschuettung
   # PW  Dividend_Weeks      : Wochen bis zur Dividendenausschuettung
   # PWS Dividend_Yield      : Prozentuale Dividende bezogen auf den aktuellen Wert
   # PW  Dividend_Currency   : Waehrung der Dividendenausschuettung
-  # PW  Last_Trade          : Zeitpunkt des letzter Handels
   # PW  Last_Trade_Date     : Datum des letzter Handels
   # PW  Last_Trade_Time     : Uhrzeit des letzter Handels
   # PW  Last_Trade_TS       : Timestamp des letzter Handels
@@ -1545,6 +1545,9 @@ sub Ausgabe_schreiben {
         # Fuer alle Dateien
         if (defined(my $data = Configuration->config("Ausgabeformat_$typ", 'Data'))) {
           Trace->Trc('I', 5, "Bearbeite Ausgabedatei <$typ> Position <$pos>");
+          if ($pos eq "GSK 1") {
+            sleep 1;
+          }
           # Wenn Data dann erzeuge und Schreiben Datastring
           my $count = 1;
           while (defined($self->{Ausgabe}{$name}{Data}{$posname})) {
