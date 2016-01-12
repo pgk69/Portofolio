@@ -1198,11 +1198,11 @@ sub Portofolios_summieren {
         $posptr->{Stock_Exchange}      = defined($kurs{Stock_Exchange}) ? $kurs{Stock_Exchange} : '';
     
         # Dividendeninfos falls vorhanden aus Kurs holen andernfalls aus ini
-        $posptr->{Dividend}            = $kurs{Dividend} if defined($kurs{Dividend});
+        $posptr->{Dividend}            = $kurs{Dividend} if (defined($kurs{Dividend}) && (!defined($posptr->{Dividend}) || ($posptr->{Dividend} eq '')));
         $posptr->{Dividend}            ||= 0;
         $posptr->{Dividend_Pos}        = $posptr->{Quantity} * $posptr->{Dividend};
         if ($posptr->{Dividend} > 0) {
-          $posptr->{Dividend_Date}     = $kurs{Dividend_Date} if defined($kurs{Dividend_Date});
+          $posptr->{Dividend_Date}     = $kurs{Dividend_Date} if (defined($kurs{Dividend_Date}) && (!defined($posptr->{Dividend_Date}) || ($posptr->{Dividend_Date} eq '')));
           $posptr->{Dividend_Date}     = "01/01/2000" if !$posptr->{Dividend_Date};
           if ($posptr->{Dividend_Date} =~ m/([0-9]+)\.([0-9]+)\.([0-9]+)$/) {
             $posptr->{Dividend_Date}   = "$2/$1/$3";
@@ -1326,14 +1326,27 @@ sub Portofolios_analysieren {
       my $posptr  = $self->{Portofolios}{$depot}{$pos};
       my $kursptr = defined($posptr->{Symbol_Local}) ? $self->{Kurs}{$posptr->{Symbol_Local}} : undef;
       # Prozentuale Werte und Gewichtung berechnen
-      if (defined($kursptr->{Dividend_Yield})) {
-        $posptr->{Dividend_Yield}       = $kursptr->{Dividend_Yield};
+#      if (defined($kursptr->{Dividend_Yield})) {
+#        $posptr->{Dividend_Yield}       = $kursptr->{Dividend_Yield};
+#      } else {
+#        if ($posptr->{Price}) {
+#          $posptr->{Dividend_Yield}     = 100 * $posptr->{Dividend} / $posptr->{Price};
+#        } else {
+#          if ($posptr->{Price_Pos}) {
+#            $posptr->{Dividend_Yield}   = 100 * $posptr->{Dividend_Pos} / $posptr->{Price_Pos};
+#          } else {
+#            $posptr->{Dividend_Yield}   = 0;
+#          }
+#        }
+#      }
+      if ($posptr->{Price}) {
+        $posptr->{Dividend_Yield}     = 100 * $posptr->{Dividend} / $posptr->{Price};
       } else {
-        if ($posptr->{Price}) {
-          $posptr->{Dividend_Yield}     = 100 * $posptr->{Dividend} / $posptr->{Price};
+        if ($posptr->{Price_Pos}) {
+          $posptr->{Dividend_Yield}   = 100 * $posptr->{Dividend_Pos} / $posptr->{Price_Pos};
         } else {
-          if ($posptr->{Price_Pos}) {
-            $posptr->{Dividend_Yield}   = 100 * $posptr->{Dividend_Pos} / $posptr->{Price_Pos};
+          if (defined($kursptr->{Dividend_Yield})) {
+            $posptr->{Dividend_Yield} = $kursptr->{Dividend_Yield};
           } else {
             $posptr->{Dividend_Yield}   = 0;
           }
