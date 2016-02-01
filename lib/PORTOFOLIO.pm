@@ -1534,7 +1534,13 @@ sub Ausgabe_schreiben {
                                                                       'Depot',    $depot,
                                                                       'Position', $pos);
       $formatstring =~ s/([^\|]*_C\|)[^\|]*/$1/g;
-      my $posname = my $cntposname = defined($self->{Portofolios}{$depot}{$pos}{Name}) ? uc($self->{Portofolios}{$depot}{$pos}{Name}) : uc($pos);
+      my ($posname, $cntposname);
+      if (defined($self->{Portofolios}{$depot}{$pos}{Name}) && $self->{Portofolios}{$depot}{$pos}{Name} ne '') {
+        $posname = uc($self->{Portofolios}{$depot}{$pos}{Name})
+      } else {
+       $posname = uc($pos);
+      }
+      $cntposname = $posname;
       foreach my $typ (keys %ausgabedatei) {
         next if ($typ eq 'Cash');
         next if (($typ eq 'Depot') && ($depot eq 'Summe'));
@@ -1548,7 +1554,8 @@ sub Ausgabe_schreiben {
           # Wenn Data dann erzeuge und Schreiben Datastring
           my $count = 1;
           while (defined($self->{Ausgabe}{$name}{Data}{$posname})) {
-            $posname = uc("$cntposname $count++");
+            $posname = uc("$cntposname $count");
+            $count++;
           }
           if ($self->{Ausgabe}{$name}{Color}) {
             $self->{Ausgabe}{$name}{Data}{$posname} = Utils::extendString($data, $formatstringC, '');
