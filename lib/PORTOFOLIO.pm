@@ -1073,8 +1073,18 @@ sub Kurse_umrechnen {
     }
     
     # Speichern der High-/Low-Werte
-    $HighLow{"H_$pos"} = $self->{Kurs}{$pos}{Price_High} = max($HighLow{"H_$pos"} || 0, $self->{Kurs}{$pos}{Price});
-    $HighLow{"L_$pos"} = $self->{Kurs}{$pos}{Price_Low} = min($HighLow{"L_$pos"} || 999999, $self->{Kurs}{$pos}{Price});
+    $self->{Kurs}{$pos}{Price_High} = max($HighLow{"H_$pos"} || 0, $self->{Kurs}{$pos}{Price});
+    $self->{Kurs}{$pos}{Price_High_Date} = $HighLow{"HD_$pos"};
+    if ($HighLow{"H_$pos"} ne $self->{Kurs}{$pos}{Price_High}) {
+      $HighLow{"HD_$pos"} = $self->{Kurs}{$pos}{Price_High_Date} = time2str('%d.%m.%y', time());
+      $HighLow{"H_$pos"} = $self->{Kurs}{$pos}{Price_High};
+    }
+    $self->{Kurs}{$pos}{Price_Low} = min($HighLow{"L_$pos"} || 999999, $self->{Kurs}{$pos}{Price});
+    $self->{Kurs}{$pos}{Price_Low_Date} = $HighLow{"LD_$pos"};
+    if ($HighLow{"L_$pos"} ne $self->{Kurs}{$pos}{Price_Low}) {
+      $HighLow{"LD_$pos"} = $self->{Kurs}{$pos}{Price_Low_Date} = time2str('%d.%m.%y', time());
+      $HighLow{"L_$pos"} = $self->{Kurs}{$pos}{Price_Low};
+    }
   }
   if (Configuration->config('Prg', 'HighLow')) {
     my $HighLowRef = \%HighLow;
@@ -1203,7 +1213,9 @@ sub Portofolios_summieren {
         }
         $posptr->{Price}               = $kurs{Price} ? $kurs{Price} : $posptr->{Price_Buy};
         $posptr->{Price_Low}           = $kurs{Price_Low} ? $kurs{Price_Low} : $posptr->{Price};
+        $posptr->{Price_Low_Date}      = defined($kurs{Price_Low_Date}) ? $kurs{Price_Low_Date} : '';
         $posptr->{Price_High}          = $kurs{Price_High} ? $kurs{Price_High} : $posptr->{Price};
+        $posptr->{Price_High_Date}     = defined($kurs{Price_High_Date}) ? $kurs{Price_High_Date} : '';
         $posptr->{Price_Pos}           = $posptr->{Quantity} * $posptr->{Price};
         $posptr->{Change}              = $posptr->{Price} - $posptr->{Price_Buy};
         $posptr->{Change_Pos}          = $posptr->{Price_Pos} - $posptr->{Price_Buy_Pos};
