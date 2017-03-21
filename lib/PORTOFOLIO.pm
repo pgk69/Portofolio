@@ -17,7 +17,7 @@ package PORTOFOLIO;
 # use warnings  qw(FATAL utf8);    # fatalize encoding glitches
 use v5.16;     # or later to get "unicode_strings" feature
 use open qw(:utf8 :std);    # undeclared streams in UTF-8
-# no warnings 'redefine';
+no warnings 'redefine';
 
 # use charnames qw(:full :short);  # unneeded in v5.16
 # binmode STDOUT, ":utf8";
@@ -82,6 +82,7 @@ use Locale::Currency;
 #
 # Variablendefinition
 #
+my %HighLow;
 
 #
 # Methodendefinition
@@ -201,6 +202,15 @@ sub _init {
     $self->{VarFile} = Utils::extendString(Configuration->config('Prg', 'VarFile'), "BIN|$Bin|SCRIPT|" . uc($Script));
     if (exists($self->{VarFile})) {
       eval {$self->{Kurs} = retrieve($self->{VarFile});};
+    }
+  }
+
+  # HighLow-Werte sichern
+  if (Configuration->config('Prg', 'HighLow')) {
+    my $hlFile = Utils::extendString(Configuration->config('Prg', 'HighLow'), "BIN|$Bin|SCRIPT|" . uc($Script));
+    if (-r $hlFile) {
+      my $HighLowRef = retrieve($hlFile);
+      %HighLow = %$HighLowRef;
     }
   }
 
@@ -435,7 +445,7 @@ sub _webabruf_QUOTE {
   Trace->Trc('S', 3, 0x00001, $self->{subroutine}, $self->{Eingabedatei});
 
   no autovivification;
-  
+ 
   my $quoter = Finance::Quote->new();
   $quoter->set_currency($self->{BasisCur});  # Set default currency.
   # Wechselkurse ermitteln
@@ -990,6 +1000,9 @@ sub Kurse_umrechnen {
   # Ausserdem werden Waehrungsfelder ggf. umgerechnet
   
   my $self = shift;
+  
+  sub max ($$) { $_[$_[0] < $_[1]] }
+  sub min ($$) { $_[$_[0] > $_[1]] }
 
   my $merker = $self->{subroutine};
   $self->{subroutine} = (caller(0))[3];
@@ -1032,9 +1045,9 @@ sub Kurse_umrechnen {
   }
   
   # Umrechnen aller Kurs Positionen
-  foreach my $pos (keys(%{$self->{Kurs}})) {
+  foreach my $pos (sort(keys(%{$self->{Kurs}}))) {
     if ($self->{Kurs}{$pos}{Currency} ne $self->{BasisCur}) {
-      foreach my $attribute ('Change', 'Change_Day', 'Price_Last_Trade') {
+      foreach my $attribute ('Change', 'Change_Day', 'Price') {
         if ($self->{Kurs}{$pos}{$attribute}) {
           $self->{Kurs}{$pos}{$attribute} *= $self->{Exchangerate}{$self->{Kurs}{$pos}{Currency}}{Rate};
         }
@@ -1057,7 +1070,16 @@ sub Kurse_umrechnen {
       if ($self->{Flags}{$attribute}{Faktor}) {
         $self->{Kurs}{$pos}{$attribute} *= $self->{Flags}{$attribute}{Faktor};
       }
-    } 
+    }
+    
+    # Speichern der High-/Low-Werte
+    $HighLow{"H_$pos"} = $self->{Kurs}{$pos}{Price_High} = max($HighLow{"H_$pos"} || 0, $self->{Kurs}{$pos}{Price});
+    $HighLow{"L_$pos"} = $self->{Kurs}{$pos}{Price_Low} = min($HighLow{"L_$pos"} || 999999, $self->{Kurs}{$pos}{Price});
+  }
+  if (Configuration->config('Prg', 'HighLow')) {
+    my $HighLowRef = \%HighLow;
+    my $hlFile = Utils::extendString(Configuration->config('Prg', 'HighLow'), "BIN|$Bin|SCRIPT|" . uc($Script));
+    store($HighLowRef, $hlFile);
   }
   
   # Umrechnen aller Cash Positionen
@@ -1093,6 +1115,8 @@ sub Portofolios_summieren {
   # PW  Quantity            : Amount of Shares in Position
   # PWS Weight_Dep          : Weighth of the Position in the Portofolio
   # PW  Price               : Aktueller Preis per Share
+  # PW  Price_Low           : Niedrigerster Preis per Share seit Kauf
+  # PW  Price_High          : Hoechster Preis per Share seit Kauf
   # PW  Price_Pos           : Aktueller Preis der Position
   # PW  Price_Last          : Letzter Preis per Share
   # PWS Price_Last_Pos      : Letzter Preis der Position
@@ -1178,6 +1202,8 @@ sub Portofolios_summieren {
           $posptr->{Price_Buy} = '0';
         }
         $posptr->{Price}               = $kurs{Price} ? $kurs{Price} : $posptr->{Price_Buy};
+        $posptr->{Price_Low}           = $kurs{Price_Low} ? $kurs{Price_Low} : $posptr->{Price};
+        $posptr->{Price_High}          = $kurs{Price_High} ? $kurs{Price_High} : $posptr->{Price};
         $posptr->{Price_Pos}           = $posptr->{Quantity} * $posptr->{Price};
         $posptr->{Change}              = $posptr->{Price} - $posptr->{Price_Buy};
         $posptr->{Change_Pos}          = $posptr->{Price_Pos} - $posptr->{Price_Buy_Pos};
@@ -1354,6 +1380,8 @@ sub Portofolios_analysieren {
       }
       $posptr->{Dividend_Currency}      = $self->{BasisCur};
       $posptr->{Change_Percent}         = $posptr->{Price_Buy_Pos} ? 100 * $posptr->{Change_Pos} / $posptr->{Price_Buy_Pos} : 0;
+      $posptr->{Change_Percent_Low}     = $posptr->{Price_Low} ? 100 * ($posptr->{Price}-$posptr->{Price_Low}) / $posptr->{Price_Low} : 0;
+      $posptr->{Change_Percent_High}    = $posptr->{Price_High} ? 100 * ($posptr->{Price_High}-$posptr->{Price}) / $posptr->{Price_High} : 0;
       if (!defined($posptr->{Change_Day_Percent})) {
         $posptr->{Change_Day_Percent}   = $posptr->{Price_Last_Pos} ? 100 * $posptr->{Change_Day_Pos} / $posptr->{Price_Last_Pos} : 0;
       }
