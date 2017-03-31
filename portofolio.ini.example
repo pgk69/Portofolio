@@ -7,6 +7,7 @@ LockFile         = ~/.portofolio/PORTOFOLIO.pid
 PosAufsummieren  = 1
 Gesamtliste      = Summe
 BasisCurrency    = EUR
+HighLow          = ~/.portofolio/HighLow.txt
 
 [Debug]
 Level            = 2
@@ -15,28 +16,32 @@ Events           = DISML
 File          = |1
 # File          = ~/Work/PORTOFOLIO/$JAHR$$MONAT$$TAG$.$PID$.dbg|1
 
-[Color]
+Color]
 clear            = clear
 reset            = white on_ansi0
 
+#normal           = on_black
+#invers           = on_bright_black
 normal           = on_ansi0
 invers           = on_grey5
 
 pp               = bright_green
 p                = bright_cyan
 neutral          = bright_white
+#m                = rgb525
+#mm               = rgb501
 m                = bright_magenta
 mm               = bright_red
 
 [Eingabedatei]
 Portofolios      = depots.ini
-Watchlists       = watchlists.ini
+#Watchlists       = watchlists.ini
 
 [Ausgabedatei]
 Summe            = ~/.portofolio/$Depot$.txt
 Depot            = ~/.portofolio/$Depot$.txt
-Export           = ~/Work/PORTOFOLIO/$Depot$.csv
-Cash             = ~/Work/PORTOFOLIO/Cash.csv
+Export           = ~/Documents/$Depot$.csv
+Cash             = ~/Documents/Cash.csv
 
 # Verfuegbare Parameter
 # Konsolensteuerung (Farbe):
@@ -61,7 +66,7 @@ Cash             = ~/Work/PORTOFOLIO/Cash.csv
 # D                           : Prozentuale Tagesaenderung bezogen auf den Vortageskurs
 # DP                          : Prozentuale Tagesaenderung des Portofolios bezogen auf den Vortageskurs des gesamten Portofolios
 # P                           : Portion am Gesamtvermoegen
-# Y                           : Dividend
+# Y                           : Dividende
 # L                           : Letzter Kurs veraltet
 
 # Verfuegbare Werte fuer Einzelpositionen und Portofolios
@@ -71,6 +76,7 @@ Cash             = ~/Work/PORTOFOLIO/Cash.csv
 # Position               CEDS : C-Head:Inhaber  C-Data:Inhaber/Bank/Waehrung/Kontostand  ED-Head:Depotname S-Data:Position
 # Name                        : Name der Position
 # WKN                         : WKN der Position
+# ISIN                        : ISIN der Position
 # Symbol                      : Kurzsymbol der Position
 # Symbol_Local                : Symbol der Position mit Handalsplatz
 # Symbols_Local               : List of local alternative Symbols
@@ -78,6 +84,8 @@ Cash             = ~/Work/PORTOFOLIO/Cash.csv
 # Quantity                    : Amount of Shares in Position
 # Weight_Dep              EDS : Weight of the Position in the Portofolio ED-Head/S-Data
 # Price                       : Aktueller Preis per Share
+# Price_Low                   : Niedrigerster Preis per Share seit Kauf
+# Price_High                  : Hoechster Preis per Share seit Kauf
 # Price_Pos               EDS : Aktueller Preis der Position ED-Head/S-Data
 # Price_Last                  : Letzter Preis per Share
 # Price_Last_Pos          EDS : Letzter Preis der Position ED-Head/S-Data
@@ -92,11 +100,13 @@ Cash             = ~/Work/PORTOFOLIO/Cash.csv
 # Change_Day_Percent      EDS : Prozentuale Veraenderung am aktuellen Tag ED-Head/S-Data
 # Change_Day_Percent_Dep  EDS : Prozentuale Tagesaenderung des Portofolios bezogen auf den Vortageskurs des gesamten Portofolios ED-Head/S-Data
 # Currency                    : Waehrung der Position
-# Dividend                    : Dividend per Share
-# Dividend_Pos            EDS : Absolute Dividend in Position ED-Head/S-Data
-# Dividend_Date               : Datum der Dividendnausschuettung
-# Dividend_Yield          EDS : Prozentuale Dividend bezogen auf den aktuellen Wert ED-Head/S-Data
-# Dividend_Currency           : Waehrung der Dividendnausschuettung
+# Dividend                    : Dividende per Share
+# Dividend_Pos            EDS : Absolute Dividende in Position ED-Head/S-Data
+# Dividend_Date               : Datum der Dividendenausschuettung
+# Dividend_Days               : Tage bis zur Dividendenausschuettung
+# Dividend_Weeks              : Wochen bis zur Dividendenausschuettung
+# Dividend_Yield          EDS : Prozentuale Dividende bezogen auf den aktuellen Wert ED-Head/S-Data
+# Dividend_Currency           : Waehrung der Dividendenausschuettung
 # Last_Trade                  : Zeitpunkt des letzter Handels
 # Last_Trade_Date             : Datum des letzter Handels
 # Last_Trade_Time             : Uhrzeit des letzter Handels
@@ -112,21 +122,20 @@ Cash             = ~/Work/PORTOFOLIO/Cash.csv
   
 [Ausgabeformat_Summe]
 Color = 1
-Head = $Change_Percent_C$Summe$N_C$ $Change_Day_Percent_C$$TAG$.$MONAT$.$JAHR$ $STUNDE$:$MINUTE$: $Change_Day_Percent%5.2f$%  $Change_Day_Pos%7.2f$€$N_C$  $Change_Percent_C$Kaufwert: $Price_Buy_Pos%9.2f$€  aktueller Wert: $Price_Pos%9.2f$€  Aenderung: $Change_Pos%8.2f$€ ($Change_Percent%.2f$%)$N_C$  $Dividend_Yield_C$Dividend: $Dividend_Pos%5.2f$€ ($Dividend_Yield%.2f$%)
+Head = $Change_Percent_C$Summe$N_C$ $Change_Day_Percent_C$$TAG$.$MONAT$.$JAHR$ $STUNDE$:$MINUTE$: $Change_Day_Percent%5.2f$%  $Change_Day_Pos%7.2f$€$N_C$  $Change_Percent_C$Kaufwert: $Price_Buy_Pos%9.2f$€  aktueller Wert: $Price_Pos%9.2f$€  Aenderung: $Change_Pos%8.2f$€ ($Change_Percent%.2f$%)$N_C$  $Dividend_Yield_C$Dividende: $Dividend_Pos%5.2f$€ ($Dividend_Yield%.2f$%)
 Col  = Name                           |       Preis |  Diff %    Dep ‰             € |    EK-Preis   Diff. %             €    Dep ‰  |  Anteil |  Div %          € 
-Sep  = -------------------------------+-------------+--------------------------------+-----------------------------------------------+----------+------------------
-Data = $Change_Percent_C$$Position%-30.30s$$N_C$ | $Price_Pos%10.2f$€ $N_C$| $Change_Day_Percent_C$$Change_Day_Percent%6.2f$% $Change_Day_Percent_Dep_C$$Change_Day_Percent_Dep%7.2f$‰ $Change_Day_Pos%12.2f$€ $N_C$|$Change_Percent_C$ $Price_Buy_Pos%10.2f$€ $Change_Percent%8.2f$% $Change_Pos%12.2f$€ $Change_Percent_Dep_C$$Change_Percent_Dep%7.2f$‰  $N_C$| $Weight_Dep_C$$Weight_Dep%6.2f$% $N_C$| $Change_Percent_C$$Dividend_Yield_C%5.2f$% $Dividend_Pos%9.2f$€
+Sep  = -------------------------------+-------------+--------------------------------+-----------------------------------------------+---------+------------------
+Data = $Change_Percent_C$$Position%-30.30s$$N_C$ | $Price_Pos%10.2f$€ $N_C$| $Change_Day_Percent_C$$Change_Day_Percent%6.2f$% $Change_Day_Percent_Dep_C$$Change_Day_Percent_Dep%7.2f$‰ $Change_Day_Pos%12.2f$€ $N_C$|$Change_Percent_C$ $Price_Buy_Pos%10.2f$€ $Change_Percent%8.2f$% $Change_Pos%12.2f$€ $Change_Percent_Dep_C$$Change_Percent_Dep%7.2f$‰  $N_C$| $Weight_Dep_C$$Weight_Dep%6.2f$% $N_C$| $Change_Percent_C$$Dividend_Yield%5.2f$% $Dividend_Pos%9.2f$€
 
 [Ausgabeformat_Depot]
 Color = 1
-Head = $Change_Percent_C$$Depot%-20.20s$$N_C$ $Change_Day_Percent_C$$TAG$.$MONAT$.$JAHR$ $STUNDE$:$MINUTE$: $Change_Day_Percent%5.2f$%  $Change_Day_Pos%7.2f$€$N_C$  $Change_Percent_C$Kaufwert: $Price_Buy_Pos%9.2f$€  aktueller Wert: $Price_Pos%9.2f$€  Aenderung: $Change_Pos%8.2f$€ ($Change_Percent%.2f$%)$N_C$  $Dividend_Yield_C$Dividend: $Dividend_Pos%5.2f$€ ($Dividend_Yield%.2f$%)
-Col  = Name                 WKN    Src |    Preis   Diff %        €         ∑    Dep ‰       Pos ∑ | Anzahl | EK-Preis  Diff. %          €    Dep ‰           ∑ | Anteil |  Div %        €           ∑ Days |   Last Trade
-Sep  = --------------------------------+-----------------------------------------------------------+--------+---------------------------------------------------+--------+----------------------------------+-------------
-Data = $Change_Percent_C$$Name%-20.20s$ $WKN%-6.6s$ $Stock_Exchange%-3.3s$ $N_C$| $Change_Day_Percent_C$$Price%7.2f$€ $Change_Day_Percent%7.2f$% $Change_Day%7.2f$€ $Change_Day_Pos%8.2f$€ $Change_Day_Percent_Dep_C$$Change_Day_Percent_Dep%7.2f$‰ $Price_Pos%10.2f$€ $N_C$| $Quantity%6.6s$ | $Change_Percent_C$$Price_Buy%7.2f$€ $Change_Percent%7.2f$% $Change_Pos%9.2f$€ $Change_Percent_Dep_C$$Change_Percent_Dep%7.2f$‰ $Price_Buy_Pos%10.2f$€ $N_C$| $Weight_Dep_C$$Weight_Dep%5.2f$% $N_C$| $Dividend_Yield_C$$Dividend_Yield%5.2f$% $Dividend%7.2f$€ $Dividend_Pos%10.2f$€ $Dividend_Days_C$$Dividend_Days%4s$ $N_C$| $Last_Trade_Days_ago_C$$Last_Trade_Days_ago%3s$ days ago
-#Data = $Change_Percent_C$$Name%-20.20s$ $WKN%-6.6s$ $Stock_Exchange%-3.3s$ $N_C$| $Change_Day_Percent_C$$Price%7.2f$€ $Change_Day_Percent%7.2f$% $Change_Day%7.2f$€ $Change_Day_Pos%8.2f$€ $Change_Day_Percent_Dep_C$$Change_Day_Percent_Dep%7.2f$‰ $Price_Pos%10.2f$€ $N_C$| $Quantity%6.6s$ | $Change_Percent_C$$Price_Buy%7.2f$€ $Change_Percent%7.2f$% $Change_Pos%9.2f$€ $Change_Percent_Dep_C$$Change_Percent_Dep%7.2f$‰ $Price_Buy_Pos%10.2f$€ $N_C$| $Weight_Dep_C$$Weight_Dep%5.2f$% $N_C$| $Dividend_Yield_C$$Dividend_Yield%5.2f$% $Dividend%7.2f$€ $Dividend_Pos%10.2f$€ $Dividend_Days_C$$Dividend_Days%4s$ $Dividend_Date$ $N_C$| $Last_Trade_Days_ago_C$$Last_Trade_Days_ago%3s$ days ago
+Head = $Change_Percent_C$$Depot%-20.20s$$N_C$ $Change_Day_Percent_C$$TAG$.$MONAT$.$JAHR$ $STUNDE$:$MINUTE$: $Change_Day_Percent%5.2f$%  $Change_Day_Pos%7.2f$€$N_C$  $Change_Percent_C$Kaufwert: $Price_Buy_Pos%9.2f$€  aktueller Wert: $Price_Pos%9.2f$€  Aenderung: $Change_Pos%8.2f$€ ($Change_Percent%.2f$%)$N_C$  $Dividend_Yield_C$Dividende: $Dividend_Pos%5.2f$€ ($Dividend_Yield%.2f$%)
+Col  = Name                 ISIN         |    Preis   Diff %         ∑ | Datum  high / low Datum |   Dep ‰       Pos ∑ |     # | EK-Preis  Diff. %          €    Dep ‰           ∑ | Anteil |  Div %      €         ∑   LT
+Sep  = ----------------------------------+-----------------------------+-------------------------+---------------------+-------+---------------------------------------------------+--------+-------------------------+---
+Data = $Change_Percent_C$$Name%-20.20s$ $ISIN%-12.12s$ $N_C$| $Change_Day_Percent_C$$Price%7.2f$€ $Change_Day_Percent%7.2f$% $Change_Day_Pos%8.2f$€$N_C$ | $Change_Percent_High_C$$Price_High_Date%-5.5s$ $Change_Percent_High%4.1f$%$N_C$ $Change_Percent_Low_C$$Change_Percent_Low%4.1f$% $Price_Low_Date%-5.5s$$N_C$ | $Change_Day_Percent_Dep_C$$Change_Day_Percent_Dep%6.2f$‰ $Price_Pos%10.2f$€ $N_C$| $Quantity%5.5s$ | $Change_Percent_C$$Price_Buy%7.2f$€ $Change_Percent%7.2f$% $Change_Pos%9.2f$€ $Change_Percent_Dep_C$$Change_Percent_Dep%7.2f$‰ $Price_Buy_Pos%10.2f$€ $N_C$| $Weight_Dep_C$$Weight_Dep%5.2f$% $N_C$| $Dividend_Yield_C$$Dividend_Yield%5.2f$% $Dividend%5.2f$€ $Dividend_Pos%8.2f$€ $N_C$| $Last_Trade_Days_ago_C$$Last_Trade_Days_ago%2.0f$
 
 [Ausgabeformat_Export]
-Data = $Name$$\x09$$Price_Last%.2f$$\x09$$Currency$$\x09$$Price%.2f$$\x09$$Quantity$$\x09$$Price_Buy_Pos%.2f$$\x09$$Symbols_Local$$\x09$$Dividend%.2f$$\x09$$Branche$
+Data = $Name$$\x09$$Price%.2f$$\x09$$Price_Last%.2f$$\x09$$Currency$$\x09$$Quantity$$\x09$$Price_Buy_Pos%.2f$$\x09$$ISIN$$\x09$$WKN$$\x09$$Dividend%.2f$$\x09$$Branche$
 
 [Ausgabeformat_Cash]
 Data = $Owner$$\x09$$Bank$$\x09$$Currency_Account$$\x09$$Balance%.2f$
@@ -204,7 +213,7 @@ Info Quantity             =
 # Info Change             =
 # Info Change_Day         =
 # Info Div_Summe          =
-# Info Dividend          =
+# Info Dividende          =
 # Info Portion            =
 # Info Price              =
 # Info Price_Buy          =
@@ -215,9 +224,13 @@ Info Quantity             =
 # Erzeugt einen neuen Value R_<Ratingvalue> pp, p, neutral, p, pp je nach Value
 Last_Trade_Days_ago    = desc 10 7 2 0
 Change_Percent         = asc -10 -5 5 10
+Change_Percent_Low     = desc 10 5 3 1
+Change_Percent_High    = desc 10 5 3 1
 Change_Percent_Dep     = asc -10 -5 5 10
 Change_Day_Percent     = asc -2 -1 1 2
 Change_Day_Percent_Dep = asc -1 -0.5 0.5 1
 Weight_Dep             = range 1 3 6 10
 Dividend_Yield         = asc 1 2 3 4
 Dividend_Days          = asc 30 90 120 150
+Dividend_Weeks         = asc 4 8 12 24
+
