@@ -51,7 +51,7 @@ $| = 1;
 use FindBin qw($Bin $Script $RealBin $RealScript);
 # use lib $Bin . "/lib";       # fuer Aufruf mit voll qualifiziertem Pfad noetig
 use lib "${RealBin}/lib";
-use lib "/Users/pgk/Documents/00_Eclipse/Framework/lib";
+use lib "/Users/pgk/Documents/00_Entwicklung/Framework/lib";
 
 #
 # Module
@@ -78,7 +78,7 @@ use Fcntl;
 #
 
 # Option-Objekt: Liest und speichert die Kommandozeilenparameter
-$VERSION = CmdLine->new()->version($VERSION);
+$VERSION = CmdLine->new('Reset' => 'reset:s')->version($VERSION);
 
 # Trace-Objekt: Liest und speichert die Meldungstexte; gibt Tracemeldungen aus
 $VERSION = Trace->new()->version($VERSION);

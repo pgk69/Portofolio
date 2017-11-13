@@ -85,6 +85,7 @@
 0x02000 = Altes Lockfile gelöscht (%s).
 0x02001 = Lockfile <%s> angelegt.
 0x02002 = Basiswaehrung <%s> existiert nicht. Fallback auf EUR als Basiswaehrung.
+0x02003 = Reset historischer Wert von <%s>.
 
 0x0a000 = Programm <%s> kann nicht mehrfach gestartet werden (%s existiert bereits)!
 
@@ -115,6 +116,7 @@
 0x02103 = Letzter Wechselkurs fuer %s: <%s>
 0x02104 = Ermittle Kursinfos für <%s>
 0x02105 = Quelle: <%s>
+0x02106 = WEB-Aufruf: <%s>
 
 # Modul PORTOFOLIO
 0x02201 = Lese Portofoliodatei <%s>
