@@ -12,7 +12,7 @@ eval 'exec perl -wS $0 ${1+"$@"}'
 # $URL: $
 #-------------------------------------------------------------------------------
 
-# Letzte Aenderung: 
+# Letzte Aenderung:
 
 #TODO:
 #  - Colorierung
@@ -23,7 +23,7 @@ use v5.16;     # or later to get "unicode_strings" feature
 use strict;    # quote strings, declare variables
 use warnings  qw(FATAL utf8);    # fatalize encoding glitches
 no warnings 'redefine';
- 
+
 use open      qw(:std :utf8);    # undeclared streams in UTF-8
 #use charnames qw(:full :short);  # unneeded in v5.16
 #binmode STDOUT, ":utf8";
@@ -33,10 +33,10 @@ use vars qw($VERSION $SVN);
 
 use constant SVN_ID => '($Id: programm.pl 785 2012-03-05 09:49:17Z xck10e7 $)
 
-$Author: xck10e7 $ 
+$Author: xck10e7 $
 
-$Revision: 785 $ 
-$Date: 2012-03-05 10:49:17 +0100 (Mo, 05 Mrz 2012) $ 
+$Revision: 785 $
+$Date: 2012-03-05 10:49:17 +0100 (Mo, 05 Mrz 2012) $
 
 $URL: https://svn.fiducia.de/svn/multicom/trunk/multicom/Framework%20OO/programm.pl $
 
@@ -126,8 +126,8 @@ if ($@) {
 #     und Werte aus Portofolio überschreiben
 # 6.) Alle Positionen umrechnen in die Basiswährung
 # 7.) Ggf. aufsummieren und ausgeben
-#        
-#     
+#
+#
 #-------------------------------------------------------------------------------
 $prg->Flags_laden();
 $prg->Portofolios_lesen(CmdLine->argument());
@@ -137,6 +137,7 @@ $prg->Gesamtliste_erzeugen();
 $prg->Positionen_parsen();
 
 $prg->Wechselkurse_lesen();
+
 $prg->Kurse_ermitteln();
 
 $prg->Kurse_umrechnen();
