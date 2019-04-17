@@ -78,7 +78,8 @@ use Fcntl;
 #
 
 # Option-Objekt: Liest und speichert die Kommandozeilenparameter
-$VERSION = CmdLine->new('Reset' => 'reset:s')->version($VERSION);
+$VERSION = CmdLine->new('Reset' => 'reset:s',
+                        'Sleep' => 'sleep:i')->version($VERSION);
 
 # Trace-Objekt: Liest und speichert die Meldungstexte; gibt Tracemeldungen aus
 $VERSION = Trace->new()->version($VERSION);
