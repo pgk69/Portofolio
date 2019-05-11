@@ -2049,8 +2049,8 @@ sub Portofolios_analysieren {
 
   foreach my $depot (keys %{$self->{Portofolios}}) {
     foreach my $pos (keys %{$self->{Portofolios}{$depot}}) {
-      Trace->Trc('I', 2, "Analysiere Depot <$depot> Position <$pos>.");
       my $posptr  = $self->{Portofolios}{$depot}{$pos};
+      Trace->Trc('I', 2, "Analysiere Depot <$depot> Position <$pos>.");
       my $kursptr = defined($posptr->{Symbol_Local}) ? $self->{Kurs}{$posptr->{Symbol_Local}} : undef;
       # Prozentuale Werte und Gewichtung berechnen
 #      if (defined($kursptr->{Dividend_Yield})) {
@@ -2066,7 +2066,7 @@ sub Portofolios_analysieren {
 #          }
 #        }
 #      }
-      $posptr->{Price} = 0 if !$posptr->{Price};
+      $posptr->{Price} = 0         if !$posptr->{Price};
       if ($posptr->{Price} > 0) {
         $posptr->{Dividend_Yield}     = 100 * $posptr->{Dividend} / $posptr->{Price};
       } else {
@@ -2081,17 +2081,21 @@ sub Portofolios_analysieren {
           }
         }
       }
-      $posptr->{Dividend_Currency}      = $self->{BasisCur};
-      $posptr->{Change_Percent}         = $posptr->{Price_Buy_Pos} ? 100 * $posptr->{Change_Pos} / $posptr->{Price_Buy_Pos} : 0;
-      $posptr->{Change_Percent_Low}     = $posptr->{Price_Low} ? 100 * ($posptr->{Price}-$posptr->{Price_Low}) / $posptr->{Price_Low} : 0;
-      $posptr->{Change_Percent_High}    = $posptr->{Price_High} ? 100 * ($posptr->{Price_High}-$posptr->{Price}) / $posptr->{Price_High} : 0;
+      $posptr->{Price_Buy_Pos} = 0 if !$posptr->{Price_Buy_Pos};
+      $posptr->{Price_Low} = 0     if !$posptr->{Price_Low};
+      $posptr->{Price_High} = 0    if !$posptr->{Price_High};
+      $posptr->{Change_Percent}         = $posptr->{Price_Buy_Pos} != 0 ? 100 * $posptr->{Change_Pos} / $posptr->{Price_Buy_Pos}                 : 0;
+      $posptr->{Change_Percent_Low}     = $posptr->{Price_Low}     != 0 ? 100 * ($posptr->{Price}-$posptr->{Price_Low}) / $posptr->{Price_Low}   : 0;
+      $posptr->{Change_Percent_High}    = $posptr->{Price_High}    != 0 ? 100 * ($posptr->{Price_High}-$posptr->{Price}) / $posptr->{Price_High} : 0;
       if (!defined($posptr->{Change_Day_Percent})) {
-        $posptr->{Change_Day_Percent}   = $posptr->{Price_Last_Pos} ? 100 * $posptr->{Change_Day_Pos} / $posptr->{Price_Last_Pos} : 0;
+        $posptr->{Change_Day_Percent}   = $posptr->{Price_Last_Pos} != 0 ? 100 * $posptr->{Change_Day_Pos} / $posptr->{Price_Last_Pos} : 0;
       }
       $posptr->{Change_Day_Percent}     =~ s/%$// if (defined($posptr->{Change_Day_Percent}));
-      $posptr->{Weight_Dep}             = $self->{Portofolios}{$depot}{Summe}{Price_Pos} ? 100  * $posptr->{Price_Pos} / $self->{Portofolios}{$depot}{Summe}{Price_Pos} : 0;
-      $posptr->{Change_Percent_Dep}     = $self->{Portofolios}{$depot}{Summe}{Price_Pos} ? 1000 * $posptr->{Change_Pos} / $self->{Portofolios}{$depot}{Summe}{Price_Pos} : 0;
-      $posptr->{Change_Day_Percent_Dep} = $self->{Portofolios}{$depot}{Summe}{Price_Pos} ? 1000 * $posptr->{Change_Day_Pos} / $self->{Portofolios}{$depot}{Summe}{Price_Pos} : 0;
+      $self->{Portofolios}{$depot}{Summe}{Price_Pos} = 0 if !$self->{Portofolios}{$depot}{Summe}{Price_Pos};
+      $posptr->{Weight_Dep}             = $self->{Portofolios}{$depot}{Summe}{Price_Pos} != 0 ? 100  * $posptr->{Price_Pos} / $self->{Portofolios}{$depot}{Summe}{Price_Pos} : 0;
+      $posptr->{Change_Percent_Dep}     = $self->{Portofolios}{$depot}{Summe}{Price_Pos} != 0 ? 1000 * $posptr->{Change_Pos} / $self->{Portofolios}{$depot}{Summe}{Price_Pos} : 0;
+      $posptr->{Change_Day_Percent_Dep} = $self->{Portofolios}{$depot}{Summe}{Price_Pos} != 0 ? 1000 * $posptr->{Change_Day_Pos} / $self->{Portofolios}{$depot}{Summe}{Price_Pos} : 0;
+      $posptr->{Dividend_Currency}      = $self->{BasisCur};
 
       # Position bewerten
       foreach my $attribute (keys %{$posptr}) {
