@@ -1,0 +1,19 @@
+[Portofolio Number 1]
+# ABB
+DE000CJ5JMS3 = {"Quantity":110,   "Price_Buy_Pos":516.7,                                     "Stop":3.23, "TP":0.00, "Notiz":"      SL:3.23 H:3,97"}
+DE000CJ5JMS3 = {"Quantity":115,   "Price_Buy_Pos":514.25,                                    "Stop":3.23, "TP":0.00, "Notiz":"      SL:3.23 H:3,97"}
+
+# Convestro
+DE000CJ1UF00 = {"Quantity":430,   "Price_Buy_Pos":494.50,   "Limit1":+1.05, "Limit2":-0.95,  "Stop":0.68, "TP":0.00, "Notiz":"-1.05/-0.95 SL:0.68 H:3,75"}
+# DE000CJ1UF00 = {"Quantity":480,   "Price_Buy_Pos":504,00,                   "Limit2":-0.95,  "Stop":0.68, "TP":0.00, "Notiz":"-1.05/-0.95 SL:0.68 H:3,75"}
+## DE000CJ1UF00 = {"Quantity":530,   "Price_Buy_Pos":503,75,                                    "Stop":0.68, "TP":0.00, "Notiz":"-1.05/-0.95 SL:0.68 H:3,75"}
+
+[Portofolio Number 2]
+BE0974293251 = {"Quantity":160,   "Price_Buy_Pos":10368.1}
+DE0005408116 = {"Quantity":350,   "Price_Buy_Pos":10139.0}
+US5949181045 = {"Quantity":90,    "Price_Buy_Pos":5527.31}
+
+[Cash]
+Customer 1.Postbank    = {"Cash":12762.91}
+Customer 1.comdirect   = {"Cash":5339.57}
+Customer 2.comdirect   = {"Cash":4056.06}
