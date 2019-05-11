@@ -1,42 +1,22 @@
 [Portofolio Number 1]
-# old Syntax
-CASH.Current.Commerzbank    = JPY|307105.99
-CASH.Current.Commerzbank    = EUR|79933.99
+# ABB
+DE000CJ5JMS3 = {"Quantity":110,   "Price_Buy_Pos":516.7,    "Notiz":"      SL:3.23 H:3,97"}
+DE000CJ5JMS3 = {"Quantity":115,   "Price_Buy_Pos":514.25,   "Notiz":"      SL:3.23 H:3,97"}
 
-ABX.TO                      = CAD|740|10433.2|0.147|Rohstoff||
+# Daimler
+DE000CJ7HY40 = {"Quantity":325,   "Price_Buy_Pos":514.5,    "Notiz":"+1.55/-1.35 SL:0,98 H:3,57"}
+# DE000CJ7HY40 = {"Quantity":330,   "Price_Buy_Pos":518.5,  "Notiz":"-1.35 SL:0,98 H:3,57"}
+## DE000CJ7HY40 = {"Quantity":435,   "Price_Buy_Pos":502,   "Notiz":"      SL:0,98 H:3,57"}
 
-# new Syntax (can be mixed)
-CASH.Savings.Commerzbank    = {"Currency":"JPY", "Cash":7105.99}
-CASH.Savings.Commerzbank    = {"Currency":"EUR", "Cash":8449.99}
-CASH.Savings.Deutsche Bank  = {"Currency":"USD", "Cash":307105.99}
-
-PRG.DE                      = {"Currency":"EUR", "Quantity":100,   "Price_Buy_Pos":6955.9,   "Dividend_Share":2.3366,"Dividende_Currency":"EUR", "Branche":"Konsum",         "ISIN":"US0549385200", "WKN":"852062", "Name":"Procter & Gamble Co., The Registered Shares o.N."}
-BBT                         = {"Quantity":40,    "Price_Buy_Pos":1757.7,   "Branche":"Bank",           "ISIN":"US0549371070", "ISIN":"US0549371070", "WKN":"884233", "Name":"BB+T CORP"}
-BBT                         = {"Quantity":60,    "Price_Buy_Pos":2447.9,   "Branche":"Bank",           "ISIN":"US0549371070", "ISIN":"US0549371070", "WKN":"884233", "Name":"BB+T CORP"}
-GS7.DE                      = {"Currency":"EUR", "Quantity":320,   "Price_Buy_Pos":6085.9,   "Dividend_Share":1.078, "Dividende_Currency":"EUR", "Branche":"Pharma",         "ISIN":"US0549394056", "WKN":"940561", "Name":"GlaxoSmithKline PLC Registered Shares LS -,25"}
-RWE.DE                      = {"Currency":"EUR", "Quantity":250,   "Price_Buy_Pos":2868.4,   "Dividend_Share":1,     "Dividende_Currency":"EUR", "Branche":"Versorger",      "ISIN":"US0549370371", "WKN":"703712", "Name":"RWE AG ST O.N.", "Dividend":2.30, "Dividend_Currency":"EUR", "Dividend_Date":"06.05.15"}
-RWE.DE                      = {"Currency":"EUR", "Quantity":250,   "Price_Buy_Pos":2805.9,   "Dividend_Share":1,     "Dividende_Currency":"EUR", "Branche":"Versorger",      "ISIN":"US0549370371", "WKN":"703712", "Name":"RWE AG ST O.N.", "Dividend":2.30, "Dividend_Currency":"EUR", "Dividend_Date":"06.05.15"}
-YZA.F                       = {"Currency":"EUR", "Quantity":120,   "Price_Buy_Pos":5045.9,   "Dividend_Share":0.701, "Dividende_Currency":"EUR", "Branche":"Nahrung+Genuss", "ISIN":"US0549333471", "WKN":"A0Q4FN", "Name":"Aryzta AG Namens-Aktien SF -,02"}
-IBM.DE                      = {"Currency":"EUR", "Quantity":80,    "Price_Buy_Pos":10005.9,  "Dividend_Share":4.57,  "Dividende_Currency":"EUR", "Branche":"Technologie",    "ISIN":"US0549333535", "WKN":"851399", "Name":"Intl Business Machines Corp. Registered Shares DL -,20"}
-BIL.DE                      = {"Currency":"EUR", "Quantity":333,   "Price_Buy_Pos":5000.9,   "Dividend_Share":1.095, "Dividende_Currency":"EUR", "Branche":"Rohstoff",       "ISIN":"US0549365653", "WKN":"908101", "Name":"BHP Billiton PLC Registered Shares DL -,50", "Dividend":2.30, "Dividend_Currency":"EUR", "Dividend_Date":"06.05.15"}
-BIL.DE                      = {"Currency":"EUR", "Quantity":400,   "Price_Buy_Pos":5005.9,   "Dividend_Share":1.095, "Dividende_Currency":"EUR", "Branche":"Rohstoff",       "ISIN":"US0549889667", "WKN":"908101", "Name":"BHP Billiton PLC Registered Shares DL -,50", "Dividend":2.30, "Dividend_Currency":"EUR", "Dividend_Date":"06.05.15"}
-
+# Deutsche Bank
+DE000DDN8UA6 = {"Quantity":830,   "Price_Buy_Pos":868.9,    "Notiz":"--->  SL:1,08 26.4"}
 
 [Portofolio Number 2]
-CASH.Customer 2.Postbank    = {"Currency":"EUR", "Cash":12762.91}
-CASH.Customer 2.comdirect   = {"Currency":"EUR", "Cash":5339.57}
-CASH.Customer 2.comdirect   = {"Currency":"EUR", "Cash":4056.06}
-LR1U.HM|LR1U.MU             = {"Currency":"EUR", "Quantity":5500,  "Price_Buy_Pos":61991.93, "Dividend_Share":0,     "Dividende_Currency":"EUR", "Branche":"Holding",        "ISIN":"US0549344344", "WKN":"A0M5RF", "Name":"1A GLOBAL VALUE"}
-COM.DE                      = {"Currency":"EUR", "Quantity":2000,  "Price_Buy_Pos":22227.5,  "Dividend_Share":0.40,  "Dividende_Currency":"EUR", "Branche":"Bank",           "ISIN":"DE0324242333", "WKN":null,     "Name":null}
-DWW9.SG                     = {"Currency":"EUR", "Quantity":60,    "Price_Buy_Pos":4763.3,   "Dividend_Share":0,     "Dividende_Currency":"EUR", "Branche":"Holding",        "ISIN":"US0554543070", "WKN":null,     "Name":null}
-2IMB.HM|2IMB.MU             = {"Currency":"EUR", "Quantity":170,   "Price_Buy_Pos":25528.9,  "Dividend_Share":0,     "Dividende_Currency":"EUR", "Branche":"Holding",        "ISIN":"US0522424070", "WKN":"A0NE9G", "Name":"PI GLOBAL VALUE FUND -EUR-P-"}
-PSEC                        = {"Currency":"USD", "Quantity":1000,  "Price_Buy_Pos":8000,     "Dividend_Share":0.927, "Dividende_Currency":"EUR", "Branche":"Holding",        "ISIN":"US0543434340", "WKN":"A0B746", "Name":"Prospect Capital Corp. Registered Shares DL -,001", "Dividend":2.30, "Dividend_Currency":"EUR", "Dividend_Date":"06.05.15"}
-PSEC                        = {"Currency":"USD", "Quantity":532,   "Price_Buy_Pos":4237.95,  "Dividend_Share":0.927, "Dividende_Currency":"EUR", "Branche":"Holding",        "ISIN":"US0548657857", "WKN":"A0B746", "Name":"Prospect Capital Corp. Registered Shares DL -,001", "Dividend":2.30, "Dividend_Currency":"EUR", "Dividend_Date":"06.05.15"}
-PSEC                        = {"Currency":"USD", "Quantity":650,   "Price_Buy_Pos":5094.05,  "Dividend_Share":0.927, "Dividende_Currency":"EUR", "Branche":"Holding",        "ISIN":"GB5353345440", "WKN":"A0B746", "Name":"Prospect Capital Corp. Registered Shares DL -,001", "Dividend":2.30, "Dividend_Currency":"EUR", "Dividend_Date":"06.05.15"}
+BE0974293251 = {"Quantity":160,   "Price_Buy_Pos":10368.1}
+DE0005408116 = {"Quantity":350,   "Price_Buy_Pos":10139.0}
+US5949181045 = {"Quantity":90,    "Price_Buy_Pos":5527.31}
 
-CASH.Customer 2.DAB         = {"Currency":"EUR", "Cash":21.95}
-HAW.DE                      = {"Currency":"EUR", "Quantity":80,    "Price_Buy_Pos":1001.54,  "Dividend_Share":1.30,  "Dividende_Currency":"EUR", "Branche":"Nahrung+Genuss", "ISIN":"US0549374444", "WKN":null,     "Name":null}
-X9ID.SG                     = {"Currency":"EUR", "Quantity":41,    "Price_Buy_Pos":253.63,   "Dividend_Share":0,     "Dividende_Currency":"EUR", "Branche":"Holding",        "ISIN":"US0554441070", "WKN":null,     "Name":null}
-
-CASH.Customer 2.Deka        = {"Currency":"EUR", "Cash":0.00}
-FK83.SG                     = {"Currency":"EUR", "Quantity":490,   "Price_Buy_Pos":2500,     "Dividend_Share":0,     "Dividende_Currency":"EUR", "Branche":"Holding",        "ISIN":"US0546451070", "WKN":null,     "Name":null}
+[Cash]
+Customer 1.Postbank    = {"Cash":12762.91}
+Customer 1.comdirect   = {"Cash":5339.57}
+Customer 2.comdirect   = {"Cash":4056.06}

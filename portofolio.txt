@@ -2,8 +2,8 @@
 # Programmmeldungen
 # 0x00000-0x0ffff  Programmmeldungen
 # 0x00000-0x00fff    Allgemeine Meldungen / Meldungen Hauptprogramm
-# 0x00000-0x001ff      Meldungen Hauptprogramm 
-# 0x00200-0x002ff      Meldungen Modul CmdLine  
+# 0x00000-0x001ff      Meldungen Hauptprogramm
+# 0x00200-0x002ff      Meldungen Modul CmdLine
 # 0x00200-0x0020f        Meldung 1. Modul CmdLine Allgemein
 # 0x00210-0x0021f        Meldung 1. Modul CmdLine 1. Subroutine
 # 0x00220-0x0022f        Meldung 1. Modul CmdLine 2. Subroutine
@@ -23,8 +23,8 @@
 # 0x07000-0x07fff      Meldung 6. Modul
 # 0x08000-0x0ffff  Fehlermeldungen
 # 0x08000-0x09fff    Allgemeine Fehlermeldungen / Fehlermeldungen Hauptprogramm
-# 0x08000-0x081ff      Fehlermeldung Hauptprogramm 
-# 0x08200-0x082ff      Fehlermeldung Modul CmdLine  
+# 0x08000-0x081ff      Fehlermeldung Hauptprogramm
+# 0x08200-0x082ff      Fehlermeldung Modul CmdLine
 # 0x08200-0x0820f        Fehlermeldung 1. Modul CmdLine Allgemein
 # 0x08210-0x0821f        Fehlermeldung 1. Modul CmdLine 1. Subroutine
 # 0x08220-0x0822f        Fehlermeldung 1. Modul CmdLine 2. Subroutine
@@ -85,6 +85,7 @@
 0x02000 = Altes Lockfile gelöscht (%s).
 0x02001 = Lockfile <%s> angelegt.
 0x02002 = Basiswaehrung <%s> existiert nicht. Fallback auf EUR als Basiswaehrung.
+0x02003 = Reset historischer Wert von <%s>.
 
 0x0a000 = Programm <%s> kann nicht mehrfach gestartet werden (%s existiert bereits)!
 
@@ -115,14 +116,16 @@
 0x02103 = Letzter Wechselkurs fuer %s: <%s>
 0x02104 = Ermittle Kursinfos für <%s>
 0x02105 = Quelle: <%s>
+0x02106 = WEB-Aufruf: <%s>
+0x02107 = Gefunden Kursinfos für <%s>
 
 # Modul PORTOFOLIO
 0x02201 = Lese Portofoliodatei <%s>
 0x02202 = Lese aus Portofoliodatei <%s> Portofolio <%s>
 0x02203 = Lese aus Portofolio <%s> Position <%s>
 0x02204 = Verarbeite aus Portofolio <%s> Position <%s> : <%s>
-0x02205 = Verarbeite Werte aus Portofolio <%s> aus Position <%s>: Currency <%s>  Quantity <%s>  Buy_Price <%s>  Dividende <%s>  Branche <%s> 
-0x02206 = Aufsummierte Werte aus Portofolio <%s> aus Position <%s>: <%s> 
+0x02205 = Verarbeite Werte aus Portofolio <%s> aus Position <%s>: Currency <%s>  Quantity <%s>  Buy_Price <%s>  Dividende <%s>  Branche <%s>
+0x02206 = Aufsummierte Werte aus Portofolio <%s> aus Position <%s>: <%s>
 0x0220f = Kein Kurs ermittelbar Portofolio <%s> Position <%s> (POS_QUANTITY: <%s:%s> POS_BUY_PRICE: <%s:%s>)!
 0x02210 = Formatiere (Symbol <%s>  Flag <%s>) <%s> mit <%s>
 0x02211 = Bearbeite aus Portofolio <%s> Share-Position <%s> von <%s> bei <%s>
