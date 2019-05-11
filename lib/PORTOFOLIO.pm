@@ -2049,6 +2049,7 @@ sub Portofolios_analysieren {
 
   foreach my $depot (keys %{$self->{Portofolios}}) {
     foreach my $pos (keys %{$self->{Portofolios}{$depot}}) {
+      Trace->Trc('I', 2, "Analysiere Depot <$depot> Position <$pos>.");
       my $posptr  = $self->{Portofolios}{$depot}{$pos};
       my $kursptr = defined($posptr->{Symbol_Local}) ? $self->{Kurs}{$posptr->{Symbol_Local}} : undef;
       # Prozentuale Werte und Gewichtung berechnen
