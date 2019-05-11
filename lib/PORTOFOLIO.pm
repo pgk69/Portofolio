@@ -409,8 +409,9 @@ sub _webabruf_comdirect {
 
   my $title = 'Wertpapiersuche und Kursabfrage';
   # Fuer alle Symbole
-  # SYMBOL: foreach my $symbol (@$symbols) {
-  SYMBOL: foreach my $name (sort(keys(%name))) {
+  my @loop = sort(keys(%name));
+  my $exchange_added = 0;
+  SYMBOL: foreach my $name (@loop) {
     my $symbol = $name{$name};
     my $puffer;
     my $kursptr = $self->{Kurs}->{$symbol};
@@ -421,7 +422,7 @@ sub _webabruf_comdirect {
     $search = $symbol if !$search && $kursptr->{exchange};
     next SYMBOL if !$search;
 
-    Trace->Trc('I', 2, "Suche nach ${search}");
+    Trace->Trc('I', 5, "Suche nach ${search}");
     # Set the search ISIN
     eval {undef $field; $field = $sel->find_element('SEARCH_VALUE', 'name');};
     my $versuch = 1 + $self->{Retry} - $try;
@@ -455,7 +456,10 @@ sub _webabruf_comdirect {
       }
     }
     next SYMBOL if $name =~ /cominvest/;
-    next SYMBOL if !$sideloaded;
+    if (!$sideloaded) {
+      Trace->Trc('I', 2, "${search} nicht gefunden");
+      next SYMBOL;
+    }
 
     # Lang & Schwarz umbenennen
     $name =~ s/^Lang.*?([^\s]*)\s[^\s]*$/L\&S\-$1/;
@@ -498,6 +502,12 @@ sub _webabruf_comdirect {
       next if $fieldtext =~ /^[0-9]{2}\.[0-9]{2}\.[0-9]{2}/;
       my $valuetext = $value ? $value->get_text() : '--';
       next if $valuetext =~ /^[\-\s]+$/;
+      $fieldtext =~ s/^\s+|\s+$//g;
+      $valuetext =~ s/^\s+|\s+$//g;
+      if ($valuetext =~ /^[\-\+]?[0-9\.]+\,/) {
+        $valuetext =~ s/\.//g;
+        $valuetext =~ s/\,/\./g;
+      }
       $puffer->{$fieldtext} = $valuetext;
     }
     
@@ -517,12 +527,10 @@ sub _webabruf_comdirect {
     }
 
     # Price & Currency
-    my $Price_cur = $puffer->{Aktuell} || $puffer->{Geld} || $puffer->{'Rücknahmepreis'};
-    if ($Price_cur =~ /^([0-9\.]*[0-9,]+).*?([A-Za-z]*)$/s) {
+    my $Price_cur = $puffer->{Aktuell} || $puffer->{Geld} || $puffer->{'Rücknahmepreis'} || '0.00';
+    if ($Price_cur =~ /^([0-9]+\.[0-9]{2}).*?([A-Za-z]*)$/s) {
       $puffer->{Price}    = $1;
       $puffer->{Currency} = $2;
-      $puffer->{Price}    =~ s/\.//;
-      $puffer->{Price}    =~ s/\,/\./;
 
       if (!$puffer->{Currency}) {
         $puffer->{Currency} = $puffer->{'Währung'} if $puffer->{'Währung'};
@@ -543,6 +551,7 @@ sub _webabruf_comdirect {
             }
             if ($exchange =~ /^[0-9A-Z]{6}$/) {
               if (!$symbolhash{$exchange}) {
+                Trace->Trc('I', 2, "Lege neues Waehrungspaar an $exchange ($puffer->{Name})");
                 $self->{Kurs}->{$exchange}->{Name} = $exchange;
                 $self->{Kurs}->{$exchange}->{Symbol} = $exchange;
                 $self->{Kurs}->{$exchange}->{RegName} = $regexchange;
@@ -551,6 +560,9 @@ sub _webabruf_comdirect {
                 $self->{Kurs}->{$exchange}->{exchange} = 1;
                 $symbolhash{$exchange} = 1;
                 push(@$symbols, $exchange);
+                push(@loop, $exchange) if !defined($name{$exchange});
+                $name{$exchange} = $exchange;
+                $exchange_added = 1;
               }
             }
           }
@@ -561,20 +573,20 @@ sub _webabruf_comdirect {
     # daily change percent & absolute
     if (!$puffer->{'Diff. Vortag'}) {
       $puffer->{'Diff. Vortag'} = 0;
-      my $vortag = $puffer->{'Schluss Vortag'} || $puffer->{'Vortag'};
+      my $vortag = $puffer->{'Schluss Vortag'} || $puffer->{Vortag};
       if ($vortag) {
-        $vortag =~ s/\.//;
-        $vortag =~ s/\,/\./;
+        $puffer->{Vortag} = $vortag;
         $puffer->{'Diff. Vortag'} = 100*($puffer->{Price}-$vortag)/$vortag;
-        $puffer->{'Diff. Vortag'} =~ s/\./\,/;
       }
     }
 
-    if ($puffer->{'Diff. Vortag'} && ($puffer->{'Diff. Vortag'} =~ /^([0-9\.]*[0-9\-\+,]+)/)) {
+    if ($puffer->{'Diff. Vortag'} && ($puffer->{'Diff. Vortag'} =~ /^([\+\-]?[0-9]+\.[0-9]{2})/)) {
       $puffer->{Change_Day_Percent} = $1;
-      $puffer->{Change_Day_Percent} =~ s/\.//;
-      $puffer->{Change_Day_Percent} =~ s/\,/\./;
-      $puffer->{Change_Day}         = $puffer->{Price} * $puffer->{Change_Day_Percent}/(100-$puffer->{Change_Day_Percent});
+      if ($puffer->{Vortag} && $puffer->{Price}) {
+        $puffer->{Change_Day} = $puffer->{Price} - $puffer->{Vortag};
+      } else {
+        $puffer->{Change_Day} = $puffer->{Price} * $puffer->{Change_Day_Percent}/(100+$puffer->{Change_Day_Percent});
+      }
     }
 
     # last trade date & time
@@ -593,8 +605,6 @@ sub _webabruf_comdirect {
     $puffer->{KGV} = '';
     if ($puffer->{'KGVe:'}) {
       $puffer->{KGV} = $puffer->{'KGVe:'};
-      $puffer->{KGV} =~ s/\.//;
-      $puffer->{KGV} =~ s/\,/\./;
     }
     
     # dividend
@@ -603,10 +613,8 @@ sub _webabruf_comdirect {
       $puffer->{DIV}   = $puffer->{'DIVe:'};
       my $Dividendtext = $puffer->{'DIV'};
 
-      if ($Dividendtext =~ /^\+?([0-9]+,?[0-9]*)/) {
+      if ($Dividendtext =~ /^\+?([0-9]+\.?[0-9]*)/) {
         $puffer->{Dividend_Yield} = $1;
-        $puffer->{Dividend_Yield} =~ s/\.//;
-        $puffer->{Dividend_Yield} =~ s/\,/\./;
         $puffer->{Dividend} = $puffer->{Dividend_Yield} * $puffer->{Price} / 100;
         $puffer->{Dividend_Currency} = $puffer->{Currency};
       }
@@ -614,12 +622,10 @@ sub _webabruf_comdirect {
     
     $puffer->{Marktkapitalisierung} = $puffer->{'Marktkapital.'} || $puffer->{'Fondsvolumen'} || '';
     $puffer->{Marktkapitalisierung} = '' if $puffer->{Marktkapitalisierung} =~ /^\-\-/;
-    if ($puffer->{Marktkapitalisierung} =~ /^([0-9,]*)\s([A-Za-z\.]*)\s([A-Za-z\.]*)$/) {
+    if ($puffer->{Marktkapitalisierung} =~ /^([0-9]+\.?[0-9]*)\s([A-Za-z\.]*)\s([A-Za-z\.]*)$/) {
       $puffer->{Marktkapitalisierung} = $1;
       if ($2 eq 'Mrd.') {
-        $puffer->{Marktkapitalisierung} =~ s/,/\./g;
         $puffer->{Marktkapitalisierung} *= 1000;
-        $puffer->{Marktkapitalisierung} =~ s/\./,/g;
       }  
     }  
 
@@ -652,6 +658,10 @@ sub _webabruf_comdirect {
       if (exists($self->{VarFile})) {
         store $self->{Kurs}, $self->{VarFile}
       }
+    }
+    if ($exchange_added && $kursptr->{exchange}) {
+      $self->Reverse_Kurs;
+      $exchange_added = 0;
     }
   }
 
@@ -1587,6 +1597,25 @@ sub Kurse_ermitteln {
       $retry = $self->{Retry};
     }
   }
+
+  Trace->Trc('S', 1, 0x00002, $self->{subroutine});
+  $self->{subroutine} = $merker;
+
+  return $rc;
+} ## end sub Kurse_ermitteln
+
+
+sub Reverse_Kurs {
+  #################################################################
+  # Ermittelt reverse Kurse den exchange Rates
+  my $self = shift;
+
+  my $merker = $self->{subroutine};
+  $self->{subroutine} = (caller(0))[3];
+  Trace->Trc('S', 1, 0x00001, $self->{subroutine}, $self->{Eingabedatei});
+
+  my $rc = 0;
+
   EXCHANGERATE: foreach my $symbol (keys(%{$self->{Kurs}})) {
     my $cur = $self->{Kurs}->{$symbol};
     next EXCHANGERATE if !$cur->{exchange};
@@ -1607,7 +1636,7 @@ sub Kurse_ermitteln {
   $self->{subroutine} = $merker;
 
   return $rc;
-} ## end sub Kurse_ermitteln
+} ## end sub Reverse_Kurs
 
 
 sub Kurse_umrechnen {
@@ -1671,6 +1700,7 @@ sub Kurse_umrechnen {
     if ($kurs->{Basiswert}) {
       if ($kurs->{Basiswert} !~ /$kurs->{Name}$/) {
         $kurs->{Basiswert} = $kurs->{Basiswert} . '/' . $kurs->{Name};
+        $kurs->{Name} = $kurs->{Basiswert};
       }
     } else {
       $kurs->{Basiswert} = $kurs->{Name};
@@ -2035,10 +2065,12 @@ sub Portofolios_analysieren {
 #          }
 #        }
 #      }
-      if ($posptr->{Price}) {
+      $posptr->{Price} = 0 if !$posptr->{Price};
+      if ($posptr->{Price} > 0) {
         $posptr->{Dividend_Yield}     = 100 * $posptr->{Dividend} / $posptr->{Price};
       } else {
-        if ($posptr->{Price_Pos}) {
+        $posptr->{Price_Pos} = 0 if !$posptr->{Price_Pos};
+        if ($posptr->{Price_Pos} > 0) {
           $posptr->{Dividend_Yield}   = 100 * $posptr->{Dividend_Pos} / $posptr->{Price_Pos};
         } else {
           if (defined($kursptr->{Dividend_Yield})) {

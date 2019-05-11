@@ -1,40 +1,19 @@
 [Portofolio Number 1]
-# old Syntax
-CASH.Current.Commerzbank    = JPY|307105.99
-CASH.Current.Commerzbank    = EUR|79933.99
+# ABB
+DE000CJ5JMS3 = {"Quantity":110,   "Price_Buy_Pos":516.7,                                     "Stop":3.23, "TP":0.00, "Notiz":"      SL:3.23 H:3,97"}
+DE000CJ5JMS3 = {"Quantity":115,   "Price_Buy_Pos":514.25,                                    "Stop":3.23, "TP":0.00, "Notiz":"      SL:3.23 H:3,97"}
 
-ABX.TO                      = CAD|740|10433.2|0.147|Rohstoff||
-
-# new Syntax (can be mixed)
-CASH.Savings.Commerzbank    = {"Currency":"JPY", "Cash":7105.99}
-CASH.Savings.Commerzbank    = {"Currency":"EUR", "Cash":8449.99}
-CASH.Savings.Deutsche Bank  = {"Currency":"USD", "Cash":307105.99}
-
-ARL.DE               = {"Quantity":160,   "Price_Buy_Pos":5045.74,  "Branche":"Bank",           "ISIN":"DE0005408116", "WKN":"540811", "Name":"Aareal Bank AG Inhaber-Aktien o.N.",                          "Dividend":2.25,       "Dividend_Currency":"EUR", "Dividend_Date":"21.05.15"}
-ARL.DE               = {"Quantity":200,   "Price_Buy_Pos":5370.10,  "Branche":"Bank",           "ISIN":"DE0005408116", "WKN":"540811", "Name":"Aareal Bank AG Inhaber-Aktien o.N.",                          "Dividend":2.25,       "Dividend_Currency":"EUR", "Dividend_Date":"21.05.15"}
-BNS                  = {"Quantity":200,   "Price_Buy_Pos":10824.3,  "Branche":"Bank",           "ISIN":"CA0641491075", "WKN":"850388", "Name":"Bank of Nova Scotia"}
-BMT.DE               = {"Quantity":50,    "Price_Buy_Pos":2620.9,   "Branche":"Nahrung+Genuss", "ISIN":"GB0002875804", "WKN":"916018", "Name":"British American Tobaco",                                     "Dividend":2.09}
-DE000VN76XB4         = {"Quantity":1000,  "Price_Buy_Pos":1000,     "Branche":"Rohstoff",       "ISIN":"DE000VN76XB4", "WKN":"VN76XB", "Name":"F8LCC/VONF OPEN "}
-F                    = {"Quantity":870,   "Price_Buy_Pos":10105.73, "Branche":"Automobile",     "ISIN":"US3453708600", "WKN":"502391", "Name":"FORD MOTOR DL-,01",                                           "Dividend":0.61}
-WFC                  = {"Quantity":80,    "Price_Buy_Pos":4122.46,  "Branche":"Bank",           "ISIN":"US9497461015", "WKN":"857949", "Name":"WELLS FARGO + CO.",                                          "Dividend":1.425,       "Dividend_Currency":"EUR", "Dividend_Date":"28.05.15"}
-DE000LS9AKT4         = {"Quantity":60,    "Price_Buy_Pos":19877.8,  "Branche":"Fond",           "ISIN":"DE000LS9AKT4", "WKN":"LS9AKT", "Name":"WF20122012/LGSZ ZT"}
-
+# Convestro
+DE000CJ1UF00 = {"Quantity":430,   "Price_Buy_Pos":494.50,   "Limit1":+1.05, "Limit2":-0.95,  "Stop":0.68, "TP":0.00, "Notiz":"-1.05/-0.95 SL:0.68 H:3,75"}
+# DE000CJ1UF00 = {"Quantity":480,   "Price_Buy_Pos":504,00,                   "Limit2":-0.95,  "Stop":0.68, "TP":0.00, "Notiz":"-1.05/-0.95 SL:0.68 H:3,75"}
+## DE000CJ1UF00 = {"Quantity":530,   "Price_Buy_Pos":503,75,                                    "Stop":0.68, "TP":0.00, "Notiz":"-1.05/-0.95 SL:0.68 H:3,75"}
 
 [Portofolio Number 2]
-CASH.Customer 2.Postbank    = {"Currency":"EUR", "Cash":12762.91}
-CASH.Customer 2.comdirect   = {"Currency":"EUR", "Cash":5339.57}
-CASH.Customer 2.comdirect   = {"Currency":"EUR", "Cash":4056.06}
-LR1U.HM|LR1U.MU      = {"Currency":"EUR", "Quantity":5500,  "Price_Buy_Pos":61991.93, "Dividend_Share":0,     "Dividende_Currency":"EUR", "Branche":"Holding",        "ISIN":"US0549344344", "WKN":"A0M5RF", "Name":"1A GLOBAL VALUE"}
-COM.DE               = {"Currency":"EUR", "Quantity":2000,  "Price_Buy_Pos":22227.5,  "Dividend_Share":0.40,  "Dividende_Currency":"EUR", "Branche":"Bank",           "ISIN":"DE0324242333", "WKN":null,     "Name":null}
-DWW9.SG              = {"Currency":"EUR", "Quantity":60,    "Price_Buy_Pos":4763.3,   "Dividend_Share":0,     "Dividende_Currency":"EUR", "Branche":"Holding",        "ISIN":"US0554543070", "WKN":null,     "Name":null}
-2IMB.HM|2IMB.MU      = {"Currency":"EUR", "Quantity":170,   "Price_Buy_Pos":25528.9,  "Dividend_Share":0,     "Dividende_Currency":"EUR", "Branche":"Holding",        "ISIN":"US0522424070", "WKN":"A0NE9G", "Name":"PI GLOBAL VALUE FUND -EUR-P-"}
-PSEC                 = {"Currency":"USD", "Quantity":1000,  "Price_Buy_Pos":8000,     "Dividend_Share":0.927, "Dividende_Currency":"EUR", "Branche":"Holding",        "ISIN":"US0543434340", "WKN":"A0B746", "Name":"Prospect Capital Corp. Registered Shares DL -,001", "Dividend":2.30, "Dividend_Currency":"EUR", "Dividend_Date":"06.05.15"}
-PSEC                 = {"Currency":"USD", "Quantity":532,   "Price_Buy_Pos":4237.95,  "Dividend_Share":0.927, "Dividende_Currency":"EUR", "Branche":"Holding",        "ISIN":"US0548657857", "WKN":"A0B746", "Name":"Prospect Capital Corp. Registered Shares DL -,001", "Dividend":2.30, "Dividend_Currency":"EUR", "Dividend_Date":"06.05.15"}
-PSEC                 = {"Currency":"USD", "Quantity":650,   "Price_Buy_Pos":5094.05,  "Dividend_Share":0.927, "Dividende_Currency":"EUR", "Branche":"Holding",        "ISIN":"GB5353345440", "WKN":"A0B746", "Name":"Prospect Capital Corp. Registered Shares DL -,001", "Dividend":2.30, "Dividend_Currency":"EUR", "Dividend_Date":"06.05.15"}
+BE0974293251 = {"Quantity":160,   "Price_Buy_Pos":10368.1}
+DE0005408116 = {"Quantity":350,   "Price_Buy_Pos":10139.0}
+US5949181045 = {"Quantity":90,    "Price_Buy_Pos":5527.31}
 
-CASH.Customer 2.DAB         = {"Currency":"EUR", "Cash":21.95}
-HAW.DE                      = {"Currency":"EUR", "Quantity":80,    "Price_Buy_Pos":1001.54,  "Dividend_Share":1.30,  "Dividende_Currency":"EUR", "Branche":"Nahrung+Genuss", "ISIN":"US0549374444", "WKN":null,     "Name":null}
-X9ID.SG                     = {"Currency":"EUR", "Quantity":41,    "Price_Buy_Pos":253.63,   "Dividend_Share":0,     "Dividende_Currency":"EUR", "Branche":"Holding",        "ISIN":"US0554441070", "WKN":null,     "Name":null}
-
-CASH.Customer 2.Deka        = {"Currency":"EUR", "Cash":0.00}
-FK83.SG                     = {"Currency":"EUR", "Quantity":490,   "Price_Buy_Pos":2500,     "Dividend_Share":0,     "Dividende_Currency":"EUR", "Branche":"Holding",        "ISIN":"US0546451070", "WKN":null,     "Name":null}
+[Cash]
+Customer 1.Postbank    = {"Cash":12762.91}
+Customer 1.comdirect   = {"Cash":5339.57}
+Customer 2.comdirect   = {"Cash":4056.06}

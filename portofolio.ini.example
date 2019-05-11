@@ -35,12 +35,16 @@ File             = |1
 clear            = clear
 reset            = white on_ansi0
 
+# normal         = on_black
+# invers         = on_bright_black
 normal           = on_ansi0
 invers           = on_grey5
 
 pp               = bright_green
 p                = bright_cyan
 neutral          = bright_white
+# m              = rgb525
+# mm             = rgb501
 m                = yellow
 mm               = bright_yellow
 
@@ -48,7 +52,7 @@ mm               = bright_yellow
 Portofolios      = depots.ini
 # Watchlists     = watchlists.ini
 
-[Ausgabedatei]
+[Ausgabedateityp]
 Summe          = ~/.portofolio/$Depot$.txt
 Share          = ~/.portofolio/$Depot$.txt
 Watchlist      = ~/.portofolio/$Depot$.txt
@@ -84,7 +88,7 @@ Color = 1
 Head = $Change_Percent_C$$Depot%-20.20s$$N_C$ $Change_Day_Percent_C$$TAG$.$MONAT$.$JAHR$ $STUNDE$:$MINUTE$: $Change_Day_Percent%5.2f$%  $Change_Day_Pos%7.2f$€$N_C$  $Change_Percent_C$Kaufwert: $Price_Buy_Pos%9.2f$€  aktueller Wert: $Price_Pos%9.2f$€  Änderung: $Change_Pos%8.2f$€ ($Change_Percent%.2f$%)
 Col  = Basiswert            ISIN         |    Preis   Diff %         ∑ | Datum  low / high Datum |   Dep ‰       Pos ∑ |     # | EK-Preis  Diff. %          €    Dep ‰           ∑ | Anteil |  Notiz                  |  T
 Sep  = ----------------------------------+-----------------------------+-------------------------+---------------------+-------+---------------------------------------------------+--------+-------------------------+---
-Data = $Change_Percent_C$$Basiswert%-20.20s$ $ISIN%-12.12s$ $N_C$| $Change_Day_Percent_C$$Price%7.2f$€ $Change_Day_Percent%7.2f$% $Change_Day_Pos%8.2f$€$N_C$ | $Change_Percent_Low_C$$Price_Low_Date%-5.5s$ $Change_Percent_Low%4.1f$%$N_C$ $Change_Percent_High_C$$Change_Percent_High%4.1f$% $Price_High_Date%-5.5s$$N_C$ | $Change_Day_Percent_Dep_C$$Change_Day_Percent_Dep%6.2f$‰ $Price_Pos%10.2f$€ $N_C$| $Quantity%5.0f$ | $Change_Percent_C$$Price_Buy%7.2f$€ $Change_Percent%7.2f$% $Change_Pos%9.2f$€ $Change_Percent_Dep_C$$Change_Percent_Dep%7.2f$‰ $Price_Buy_Pos%10.2f$€ $N_C$| $Weight_Dep_C$$Weight_Dep%5.2f$% $N_C$| $Notiz%-23.23s$ $N_C$| $Last_Trade_Days_ago_C$$Last_Trade_Days_ago%2.0f$
+Data = $Change_Percent_C$$Basiswert%-20.20s$ $ISIN%-12.12s$ $N_C$| $Change_Day_Percent_C$$Price%7.2f$€ $Change_Day_Percent%7.2f$% $Change_Day_Pos%8.2f$€$N_C$ | $Change_Percent_Low_C$$Price_Low_Date%-5.5s$ $Change_Percent_Low%4.1f$%$N_C$ $Change_Percent_High_C$$Change_Percent_High%4.1f$% $Price_High_Date%-5.5s$$N_C$ | $Change_Day_Percent_Dep_C$$Change_Day_Percent_Dep%6.2f$‰ $Price_Pos%10.2f$€ $N_C$| $Quantity%5.0f$ | $Change_Percent_C$$Price_Buy%7.2f$€ $Change_Percent%7.2f$% $Change_Pos%9.2f$€ $Change_Percent_Dep_C$$Change_Percent_Dep%7.2f$‰ $Price_Buy_Pos%10.2f$€ $N_C$| $Weight_Dep_C$$Weight_Dep%5.2f$% $N_C$| $Limit1%-4.4s$ $Limit2%-4.4s$ $Stop%-4.4s$ $Notiz%-10.10s$ $N_C$| $Last_Trade_Days_ago_C$$Last_Trade_Days_ago%2.0f$
 Export = $Basiswert$$\x09$$Price%.2f$$\x09$$Price_Last%.2f$$\x09$$Currency$$\x09$$Quantity%.2f$$\x09$$Price_Buy_Pos%.2f$$\x09$$ISIN$$\x09$$WKN$$\x09$$Price_Low_Date$$\x09$$Price_Low%.2f$$\x09$$Change_Percent_Low%4.1f$$\x09$$Price_High_Date$$\x09$$Price_High%.2f$$\x09$$Change_Percent_High%4.1f$
 
 [Ausgabeformat_Cash]
